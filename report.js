@@ -7,7 +7,7 @@
 // Backup
 // ---------------------------------------------------------------------------
 
-const LIST_KEYS = ['sessions', 'mornings', 'anchors'];
+const LIST_KEYS = ['sessions', 'mornings', 'anchors', 'hrv', 'thoughts', 'reflections'];
 
 function exportBackup() {
   const data = {};

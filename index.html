@@ -24,6 +24,8 @@
 
       <div id="backupNudge"></div>
       <div id="morningCard"></div>
+      <div id="parkedCard"></div>
+      <div id="weekCard"></div>
       <div id="programCard"></div>
       <div id="resultsCard"></div>
       <div id="hrvCard"></div>
@@ -77,8 +79,27 @@
       <p class="label">Cosa c'è in gioco oggi? <small>(facoltativo)</small></p>
       <div class="chips" id="tags"></div>
       <div class="actions">
-        <button class="btn primary" data-go="setup">Avanti</button>
+        <button class="btn primary" id="checkinNext">Avanti</button>
         <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+
+    <!-- PARK: write worries and tomorrow's to-dos down before the evening session -->
+    <section class="screen" data-screen="park">
+      <h2>Parcheggio dei pensieri</h2>
+      <p class="hint">Prima di sdraiarti, svuota la testa. Quello che scrivi qui resta al sicuro fino a domattina: stanotte non devi tenerlo a mente.</p>
+      <label class="field">
+        <span>Cosa ti gira in testa?</span>
+        <textarea id="parkWorries" rows="4" placeholder="Una preoccupazione per riga"></textarea>
+      </label>
+      <label class="field">
+        <span>Cosa farai domani?</span>
+        <textarea id="parkTodo" rows="4" placeholder="Una cosa per riga"></textarea>
+      </label>
+      <p class="hint drift-note" id="parkNote" hidden>Lasciali alla corrente.</p>
+      <div class="actions">
+        <button class="btn primary" id="parkSave">Parcheggia e continua</button>
+        <button class="btn ghost" id="parkSkip">Salta stasera</button>
       </div>
     </section>
 
@@ -239,6 +260,7 @@
   <script src="app.js"></script>
   <script src="hrv.js"></script>
   <script src="anchor.js"></script>
+  <script src="reflect.js"></script>
   <script src="report.js"></script>
 </body>
 </html>

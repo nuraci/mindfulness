@@ -20,6 +20,9 @@ const KEYS = {
   backup: 'fluire.backup.v1',       // ts of the last export
   hrv: 'fluire.hrv.v1',             // [{ ts, rmssd, hr, n, quality, context: 'morning' | 'other' }]
   hrvSkip: 'fluire.hrvskip.v1',     // dayKey of a morning when the HRV prompt was dismissed
+  thoughts: 'fluire.thoughts.v1',   // [{ ts, worries: [], todo: [], seen }] parked before the evening session
+  reflections: 'fluire.reflections.v1', // [{ ts, week, q, a }] answers to the weekly question
+  weekHidden: 'fluire.weekhidden.v1',   // week key of the last weekly summary closed on home
 };
 
 const store = {
@@ -576,6 +579,12 @@ function bindGo(root) {
 }
 bindGo(document);
 
+// Before the evening session, offer the thought parking once per evening.
+$('#checkinNext').addEventListener('click', () => {
+  const parkedTonight = store.get(KEYS.thoughts, []).some((t) => eveningKey(t.ts) === eveningKey(Date.now()));
+  show(state.flow === 'program' && !parkedTonight ? 'park' : 'setup');
+});
+
 function bindSlider(input) {
   const out = $('#' + input.id + 'Out');
   const sync = () => (out.textContent = input.value);
@@ -640,6 +649,8 @@ function renderHome() {
   renderProgramCard(st);
   renderResults($('#resultsCard'), true);
   renderHrvCard($('#hrvCard'));
+  renderParkedCard($('#parkedCard'));
+  renderWeekly($('#weekCard'), true);
 }
 
 // Data lives only in this browser; nudge towards an export now and then.
@@ -1258,10 +1269,12 @@ function renderDiary() {
     .slice(0, 30);
 
   $('#diaryBody').innerHTML = `
+    <div id="diaryWeek"></div>
     <div id="diaryResults"></div>
     ${insights.map((t) => `<p class="insight">${t}</p>`).join('')}
     <ul class="entries">${rows.map((r) => `<li>${r.html}</li>`).join('')}</ul>`;
   renderResults($('#diaryResults'), false);
+  renderWeekly($('#diaryWeek'), false);
 }
 
 // ---------------------------------------------------------------------------
@@ -1295,7 +1308,7 @@ document.addEventListener('visibilitychange', () => {
 // in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'report.js', 'styles.css'];
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'reflect.js', 'report.js', 'styles.css'];
 
 async function fingerprint(file) {
   const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });

@@ -240,7 +240,9 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 .file-btn { text-align: center; }
 
 /* Anchor */
-.practice-btns { display: flex; flex-direction: column; gap: 6px; }
+.practice:has(.practice-btns) { flex-direction: column; align-items: stretch; }
+.practice-btns { display: flex; gap: 6px; }
+.practice-btns .btn { flex: 1; }
 .screen.anchor.running {
   position: fixed;
   inset: 0;
@@ -330,3 +332,25 @@ body[data-view="hrv"] .update-bar,
 body[data-view="night"] .update-bar { display: none; }
 
 .version { color: var(--muted); font-size: 0.75rem; text-align: center; margin: 0; opacity: 0.7; }
+
+/* Thought parking & weekly summary */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field span { font-size: 0.95rem; }
+.field textarea, textarea.reflect {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  resize: vertical;
+}
+.field textarea.drift { animation: drift 1.5s ease-in forwards; }
+@keyframes drift {
+  to { transform: translateX(110%) translateY(12px) rotate(3deg); opacity: 0; }
+}
+.drift-note { text-align: center; }
+.parked { margin: 0; padding-left: 20px; line-height: 1.6; font-size: 0.93rem; }
+.week-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.muted { color: var(--muted); }

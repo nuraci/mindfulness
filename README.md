@@ -38,6 +38,15 @@ practice lead to better mornings?).
   on but black (browsers cannot vibrate with the screen off); finishing logs
   the daytime practice. iOS browsers do not support vibration, so the button
   only appears where `navigator.vibrate` exists.
+- **Thought parking.** Before the evening session (once per evening, skippable):
+  write down what is on your mind and tomorrow's to-dos; the text drifts away
+  "downstream". The next morning the to-dos come back on home; the worries
+  stay folded unless opened. Writing a to-do list before bed has been shown to
+  shorten the time it takes to fall asleep.
+- **Weekly summary.** Last 7 days vs the 7 before: evenings practised, morning
+  gut, sleep, morning HRV, daytime anchors, the best morning and what the
+  evening before looked like, plus a rotating reflection question whose answer
+  is saved. On home on Sunday and Monday until closed; always in the diary.
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.
@@ -112,6 +121,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `program.js` | The six-week programme: per-week scripts, colours, pads, daytime practice |
 | `hrv.js` | Camera photoplethysmography: `PPG.analyse` (pure, tested) and the measurement screen |
 | `anchor.js` | Vibration-guided breathing for the daytime anchor |
+| `reflect.js` | Thought parking before the evening session and the weekly summary |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
