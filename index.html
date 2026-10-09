@@ -33,7 +33,8 @@
 
       <div class="actions">
         <button class="btn" data-go="checkin" data-flow="flow">Sessione libera</button>
-        <button class="btn" data-go="checkin" data-flow="sos">SOS · 90 secondi</button>
+        <button class="btn" id="episodeOpen">Ho un fastidio adesso</button>
+        <button class="btn" data-go="checkin" data-flow="sos">SOS ansia · 90 secondi</button>
         <button class="btn" id="anchorOpen" hidden>Àncora a vibrazione · 1 minuto</button>
         <button class="btn" id="hrvOpen">Misura il battito</button>
         <button class="btn ghost" data-go="diary">Diario</button>
@@ -146,6 +147,39 @@
         <path id="traceBreath" />
       </svg>
       <button class="btn ghost small" id="stopBtn">Termina</button>
+    </section>
+
+    <!-- EPISODE: log gut discomfort as it happens, optionally followed by the gut SOS -->
+    <section class="screen" data-screen="episode">
+      <h2>Cosa senti?</h2>
+      <div class="chips" id="epTypes"></div>
+      <label class="slider">
+        <span>Intensità <output id="epIntensityOut">5</output></span>
+        <input type="range" id="epIntensity" min="1" max="10" value="5">
+        <span class="scale"><i>lieve</i><i>fortissimo</i></span>
+      </label>
+      <p class="label">Cosa sta succedendo? <small>(facoltativo)</small></p>
+      <div class="chips" id="epContext"></div>
+      <div class="actions">
+        <button class="btn primary" id="epSos">SOS pancia · 4 minuti</button>
+        <button class="btn" id="epSave">Salva soltanto</button>
+        <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+
+    <!-- RELIEF: after the gut SOS -->
+    <section class="screen" data-screen="relief">
+      <h2>Com’è adesso?</h2>
+      <label class="slider">
+        <span>Intensità <output id="reliefIntensityOut">5</output></span>
+        <input type="range" id="reliefIntensity" min="0" max="10" value="5">
+        <span class="scale"><i>passato</i><i>fortissimo</i></span>
+      </label>
+      <div id="reliefBody"></div>
+      <div class="actions">
+        <button class="btn primary" id="reliefSave">Salva</button>
+        <button class="btn ghost" data-go="home" id="reliefHome" hidden>Torna all’inizio</button>
+      </div>
     </section>
 
     <!-- CHECK-OUT -->
@@ -268,6 +302,7 @@
   <script src="app.js"></script>
   <script src="hrv.js"></script>
   <script src="anchor.js"></script>
+  <script src="episodes.js"></script>
   <script src="reflect.js"></script>
   <script src="report.js"></script>
   <script src="sync.js"></script>

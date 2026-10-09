@@ -23,6 +23,7 @@ const KEYS = {
   thoughts: 'fluire.thoughts.v1',   // [{ ts, worries: [], todo: [], seen }] parked before the evening session
   reflections: 'fluire.reflections.v1', // [{ ts, week, q, a }] answers to the weekly question
   weekHidden: 'fluire.weekhidden.v1',   // week key of the last weekly summary closed on home
+  episodes: 'fluire.episodes.v1',   // [{ ts, types, intensity, context, after?, sos? }] gut discomfort as it happens
   sync: 'fluire.sync.v1',           // { linked, last } Google Drive sync state on this device
 };
 
@@ -341,6 +342,17 @@ const SCRIPTS = {
     [40, 'Lascia cadere le spalle. Ammorbidisci la pancia.'],
   ],
   sosEnd: 'Ancora qualche sospiro. Stai già tornando giù.',
+  // For when the gut hurts right now: warmth, the dial, the river.
+  gutSos: [
+    [0, 'Ci sono qui con te. Appoggia una mano calda sulla pancia, proprio dove senti il fastidio.'],
+    [20, 'Non devi mandarlo via. Respira dentro quella zona: l’aria arriva fin lì e la ammorbidisce.'],
+    [45, 'Senti il calore della mano. Immagina che entri piano, come acqua tiepida che scioglie un nodo.'],
+    [75, 'A ogni espirazione lunga i muscoli dell’intestino possono rilasciarsi un po’. Lascia andare la pancia, non trattenerla.'],
+    [105, 'Ora immagina la manopola. Guarda che numero segna il fastidio. Con la prossima espirazione, girala di uno scatto verso il basso.'],
+    [135, 'E ancora uno scatto. Il segnale c’è, ma arriva più piano, più lontano.'],
+    [165, 'Il fiume dentro di te ritrova il suo ritmo: lento, regolare. Non c’è niente di pericoloso. Il tuo corpo sa calmarsi.'],
+  ],
+  gutSosEnd: 'Tra poco finiamo. Resta ancora qualche respiro con la mano sulla pancia. Poi dimmi com’è adesso.',
 };
 
 class Guide {
@@ -538,7 +550,7 @@ function annotateMornings() {
   const sessions = store.get(KEYS.sessions, []);
   return store.get(KEYS.mornings, []).map((m) => ({
     ...m,
-    practiced: sessions.some((e) => e.ts <= m.ts && m.ts - e.ts <= 16 * HOUR),
+    practiced: sessions.some((e) => e.flow !== 'sos' && e.ts <= m.ts && m.ts - e.ts <= 16 * HOUR),
   }));
 }
 
@@ -628,10 +640,13 @@ bindSeg('mode', 'mode');
 function renderSetup() {
   const sos = state.flow === 'sos';
   const st = state.flow === 'program' ? programStatus() : null;
-  $('#setupTitle').textContent = sos
+  const gutSos = state.flow === 'gutsos';
+  $('#setupTitle').textContent = gutSos
+    ? 'SOS pancia · 4 minuti'
+    : sos
     ? 'SOS · sospiro fisiologico'
     : st ? `Settimana ${st.week} · ${PROGRAM[st.week - 1].title}` : 'Sessione libera';
-  $('#durationGroup').style.display = sos ? 'none' : '';
+  $('#durationGroup').style.display = sos || gutSos ? 'none' : '';
   $('#modeHint').textContent =
     state.mode === 'belly'
       ? 'Sdraiati e appoggia il telefono sulla pancia, sotto l’ombelico, con una mano sopra. Il telefono potrebbe chiederti il permesso di usare i sensori di movimento. Su iPhone togli la modalità silenziosa per sentire il suono.'
@@ -988,10 +1003,11 @@ const FREE_BREATH = 90; // seconds at the end of long evening sessions with no c
 
 $('#startBtn').addEventListener('click', async () => {
   const sos = state.flow === 'sos';
+  const gutSos = state.flow === 'gutsos';
   const st = state.flow === 'program' ? programStatus() : null;
   const week = st ? PROGRAM[st.week - 1] : null;
   const belly = state.mode === 'belly';
-  const duration = sos ? 90 : state.duration;
+  const duration = sos ? 90 : gutSos ? 240 : state.duration;
   const settle = belly ? 10 : 3;
 
   // Audio and speech must be unlocked synchronously inside the tap.
@@ -999,9 +1015,10 @@ $('#startBtn').addEventListener('click', async () => {
   if ($('#sound').checked) sound.start(week?.pad);
   const guide = new Guide($('#voice').checked);
 
-  if (belly && !sos) guide.say(SCRIPTS.flowSettle);
+  if (belly && !sos && !gutSos) guide.say(SCRIPTS.flowSettle);
   else if (belly) guide.say('Appoggia il telefono sulla pancia e chiudi gli occhi.');
   if (week) guide.plan(week.script.concat(WIND_DOWN), duration, PROGRAM_END);
+  else if (gutSos) guide.plan(SCRIPTS.gutSos, duration, SCRIPTS.gutSosEnd);
   else guide.plan(sos ? SCRIPTS.sos : SCRIPTS.flow, duration, sos ? SCRIPTS.sosEnd : SCRIPTS.flowEnd);
 
   let sensor = null;
@@ -1069,6 +1086,12 @@ function endSession() {
   };
   clearTags();
 
+  if (state.flow === 'gutsos') {
+    // Logged with the episode, not as a practice session.
+    s.sound.stop();
+    finishGutSos();
+    return;
+  }
   if (s.week) {
     // Evening: no questions afterwards, just let the sound dissolve.
     s.sound.stop(3);
@@ -1219,7 +1242,7 @@ function renderSummary(e) {
 function renderDiary() {
   const sessions = store.get(KEYS.sessions, []);
   const mornings = annotateMornings();
-  if (!sessions.length && !mornings.length) {
+  if (!sessions.length && !mornings.length && !store.get(KEYS.episodes, []).length) {
     $('#diaryBody').innerHTML = '<p class="hint">Ancora niente qui. Dopo la prima sessione e il primo check-in del mattino troverai come cambia la pancia nel tempo.</p>';
     return;
   }
@@ -1246,6 +1269,8 @@ function renderDiary() {
     const list = suspects.slice(0, 3).map((x) => `<strong>${x.f.toLowerCase()}</strong> (${x.yes.toFixed(1)} contro ${x.no.toFixed(1)})`).join(', ');
     insights.push(`Mattine più difficili dopo una cena con ${list}. È un indizio da osservare, non una prova: parlane con il medico prima di eliminare cibi.`);
   }
+  const episodes = store.get(KEYS.episodes, []);
+  insights.push(...episodeInsights(episodes));
   const syncs = sessions.filter((e) => e.sync != null).slice(-5);
   if (syncs.length >= 2) {
     insights.push(`Sintonia nelle ultime sessioni con il telefono sulla pancia: ${syncs.map((e) => e.sync + '%').join(' · ')}.`);
@@ -1264,6 +1289,7 @@ function renderDiary() {
         : `Stress ${e.stressBefore} · Pancia ${e.gutBefore}`;
       return { ts: e.ts, html: `${kind} · ${vals}<div class="meta">${when(e.ts)} · ${mins}${e.tags?.length ? ' · ' + e.tags.join(', ') : ''}</div>` };
     }),
+    ...episodes.map((e) => ({ ts: e.ts, html: `${episodeRow(e)}<div class="meta">${when(e.ts)}${e.context?.length ? ' · ' + e.context.join(', ') : ''}</div>` })),
     ...mornings.map((m) => ({ ts: m.ts, html: `Mattino · Pancia ${m.gut} · Sonno ${m.sleep}<div class="meta">${when(m.ts)}</div>` })),
   ]
     .sort((a, b) => b.ts - a.ts)
@@ -1309,7 +1335,7 @@ document.addEventListener('visibilitychange', () => {
 // in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'episodes.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
 
 async function fingerprint(file) {
   const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });

@@ -89,6 +89,7 @@ function weekStats(from, to) {
     sleep: mornings.length ? avg(mornings.map((m) => m.sleep)) : null,
     hrv: hrvs.length ? avg(hrvs.map((m) => m.rmssd)) : null,
     anchors: store.get(KEYS.anchors, []).filter(inRange).length,
+    episodes: store.get(KEYS.episodes, []).filter((e) => inRange(e.ts)).length,
   };
 }
 
@@ -110,13 +111,18 @@ function renderWeekly(el, onHome) {
   }
   const cur = weekStats(now - WEEK, now);
   const prev = weekStats(now - 2 * WEEK, now - WEEK);
-  if (!cur.evenings && !cur.mornings.length) { el.innerHTML = ''; return; }
+  if (!cur.evenings && !cur.mornings.length && !cur.episodes) { el.innerHTML = ''; return; }
 
   const rows = [];
   rows.push(`Sere di pratica: <strong>${cur.evenings} su 7</strong>${prev.evenings || prev.mornings.length ? ` <span class="muted">(la settimana prima ${prev.evenings})</span>` : ''}`);
   if (cur.gut != null) rows.push(`Pancia al mattino: media <strong>${cur.gut.toFixed(1)}</strong>${compare(cur.gut, prev.gut, 'down')}`);
   if (cur.sleep != null) rows.push(`Sonno: media <strong>${cur.sleep.toFixed(1)}</strong>${compare(cur.sleep, prev.sleep, 'up')}`);
   if (cur.hrv != null) rows.push(`HRV al mattino: <strong>${Math.round(cur.hrv)} ms</strong>${compare(cur.hrv, prev.hrv, 'up', 0)}`);
+  if (cur.episodes || prev.episodes) {
+    const d = cur.episodes - prev.episodes;
+    const word = d < 0 ? '<span class="good">(meno della settimana prima: ' + prev.episodes + ')</span>' : d > 0 ? `<span class="muted">(la settimana prima ${prev.episodes})</span>` : '<span class="muted">(come la settimana prima)</span>';
+    rows.push(`Fastidi segnati durante il giorno: <strong>${cur.episodes}</strong> ${word}`);
+  }
   if (cur.anchors) rows.push(`Àncore durante il giorno: <strong>${cur.anchors}</strong>`);
 
   // The best morning, and what the evening before looked like.

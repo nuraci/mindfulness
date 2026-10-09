@@ -7,7 +7,7 @@
 // Backup
 // ---------------------------------------------------------------------------
 
-const LIST_KEYS = ['sessions', 'mornings', 'anchors', 'hrv', 'thoughts', 'reflections'];
+const LIST_KEYS = ['sessions', 'mornings', 'anchors', 'hrv', 'thoughts', 'reflections', 'episodes'];
 
 // Everything Fluire stores, minus the keys named in `skip`.
 function collectData(skip = []) {
@@ -38,9 +38,17 @@ function importBackup(json, skip = []) {
       const tsOf = (x) => (typeof x === 'number' ? x : x.ts);
       const byTs = new Map(current.map((x) => [tsOf(x), x]));
       const fresh = incoming.filter((x) => !byTs.has(tsOf(x)));
-      // A parked thought marked as seen on one device is seen everywhere.
-      if (name === 'thoughts') for (const x of incoming) if (x.seen && byTs.has(x.ts)) byTs.get(x.ts).seen = true;
-      if (!fresh.length && name !== 'thoughts') continue;
+      // The same entry on both sides: fill in what one of them lacks (e.g. the
+      // relief after a gut SOS) and keep a thought "seen" once seen anywhere.
+      let changed = false;
+      for (const x of incoming) {
+        const mine = byTs.get(tsOf(x));
+        if (!mine || typeof mine !== 'object') continue;
+        for (const [k, v] of Object.entries(x)) {
+          if ((mine[k] == null && v != null) || (k === 'seen' && v && !mine.seen)) { mine[k] = v; changed = true; }
+        }
+      }
+      if (!fresh.length && !changed) continue;
       added += fresh.length;
       store.set(key, current.concat(fresh).sort((a, b) => tsOf(a) - tsOf(b)));
     } else if (name === 'program') {
@@ -93,7 +101,7 @@ const f1 = (x) => x.toFixed(1);
 function renderReport() {
   const sessions = store.get(KEYS.sessions, []);
   const mornings = annotateMornings();
-  const all = [...sessions.map((e) => e.ts), ...mornings.map((m) => m.ts)];
+  const all = [...sessions.map((e) => e.ts), ...mornings.map((m) => m.ts), ...store.get(KEYS.episodes, []).map((e) => e.ts)];
   if (!all.length) {
     $('#reportBody').innerHTML = '<h2>Riepilogo</h2><p class="hint">Non ci sono ancora dati da riassumere.</p>';
     return;
@@ -125,6 +133,19 @@ function renderReport() {
   }
   if (hrvM.length >= 10) {
     row('HRV al risveglio: prime 5 misure → ultime 5', `${Math.round(avg(hrvM.slice(0, 5).map((m) => m.rmssd)))} → ${Math.round(avg(hrvM.slice(-5).map((m) => m.rmssd)))} ms`);
+  }
+
+  const eps = store.get(KEYS.episodes, []);
+  if (eps.length) {
+    row('Episodi di fastidio segnati durante il giorno', `${eps.length}, intensità media ${f1(avg(eps.map((e) => e.intensity)))} (1–10)`);
+    const types = {};
+    for (const e of eps) for (const t of e.types) types[t] = (types[t] || 0) + 1;
+    row('Tipi più frequenti', Object.entries(types).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t, n]) => `${t} (${n})`).join(', '));
+    const parts = {};
+    for (const e of eps) parts[partOfDay(e.ts)] = (parts[partOfDay(e.ts)] || 0) + 1;
+    row('Momento della giornata', Object.entries(parts).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${Math.round((n / eps.length) * 100)}%`).join(', '));
+    const sosDone = eps.filter((e) => e.sos && e.after != null);
+    if (sosDone.length) row('Intensità prima → dopo 4 minuti di respirazione guidata', `${f1(avg(sosDone.map((e) => e.intensity)))} → ${f1(avg(sosDone.map((e) => e.after)))} (n=${sosDone.length})`);
   }
 
   const bristol = mornings.filter((m) => m.bristol);

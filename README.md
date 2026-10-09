@@ -47,6 +47,14 @@ practice lead to better mornings?).
   gut, sleep, morning HRV, daytime anchors, the best morning and what the
   evening before looked like, plus a rotating reflection question whose answer
   is saved. On home on Sunday and Monday until closed; always in the diary.
+- **Gut episodes and the gut SOS.** "Ho un fastidio adesso" logs type
+  (cramp, bloating, urgency…), intensity and optional context in a few taps.
+  From there the gut SOS: 4 minutes of guided breathing with warmth, the dial
+  and the river, then "how is it now?". Episodes are not counted as practice.
+  The diary reports average relief from the SOS, the part of the day most
+  episodes come, the most frequent context, and episodes per day on days with
+  vs without the daytime anchor. Also in the weekly summary and the doctor's
+  summary.
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.
@@ -121,6 +129,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `program.js` | The six-week programme: per-week scripts, colours, pads, daytime practice |
 | `hrv.js` | Camera photoplethysmography: `PPG.analyse` (pure, tested) and the measurement screen |
 | `anchor.js` | Vibration-guided breathing for the daytime anchor |
+| `episodes.js` | Gut episode log, gut SOS follow-up and episode insights |
 | `reflect.js` | Thought parking before the evening session and the weekly summary |
 | `sync.js` | Optional Google Drive sync (appDataFolder) |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
