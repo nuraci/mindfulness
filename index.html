@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1620">
+  <meta name="description" content="Respiro guidato con biofeedback per calmare stress e pancia.">
+  <title>Fluire</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="river" aria-hidden="true"></canvas>
+
+  <main id="app">
+    <!-- HOME -->
+    <section class="screen active" data-screen="home">
+      <header class="brand">
+        <h1>Fluire</h1>
+        <p class="tagline">Respira con la pancia. Guarda il fiume schiarirsi.</p>
+      </header>
+
+      <div class="stats" id="homeStats"></div>
+
+      <div class="actions">
+        <button class="btn primary" data-go="checkin" data-flow="flow">Inizia una sessione</button>
+        <button class="btn" data-go="checkin" data-flow="sos">SOS · 90 secondi</button>
+        <button class="btn ghost" data-go="diary">Diario</button>
+      </div>
+
+      <details class="info">
+        <summary>Come funziona</summary>
+        <p>Il respiro lento con la pancia, con l'espirazione più lunga dell'inspirazione, attiva il nervo vago: il "cavo" che collega cervello e intestino e che riporta il corpo in modalità riposo e digestione.</p>
+        <p><strong>Modalità pancia:</strong> sdraiati e appoggia il telefono sul ventre, sotto l'ombelico. L'app sente il respiro con l'accelerometro. Quando vai a tempo con la guida il fiume si schiarisce e si accende una nota armonica. Puoi tenere gli occhi chiusi e seguire solo il suono.</p>
+        <p><strong>SOS:</strong> il "sospiro fisiologico" (due inspirazioni ravvicinate e una lunga espirazione) per i momenti di tensione acuta.</p>
+      </details>
+
+      <details class="info warn">
+        <summary>Importante</summary>
+        <p>Fluire non sostituisce il medico. Fai controllare i sintomi se noti sangue nelle feci, perdita di peso non voluta, febbre, dolore che ti sveglia di notte, anemia o cambiamenti dell'intestino nuovi e persistenti.</p>
+      </details>
+    </section>
+
+    <!-- CHECK-IN -->
+    <section class="screen" data-screen="checkin">
+      <h2>Come stai adesso?</h2>
+      <label class="slider">
+        <span>Stress <output id="stressBeforeOut">5</output></span>
+        <input type="range" id="stressBefore" min="0" max="10" value="5">
+        <span class="scale"><i>calmo</i><i>al limite</i></span>
+      </label>
+      <label class="slider">
+        <span>Pancia <output id="gutBeforeOut">5</output></span>
+        <input type="range" id="gutBefore" min="0" max="10" value="5">
+        <span class="scale"><i>tranquilla</i><i>molto fastidio</i></span>
+      </label>
+      <p class="label">Cosa c'è in gioco oggi? <small>(facoltativo)</small></p>
+      <div class="chips" id="tags"></div>
+      <div class="actions">
+        <button class="btn primary" data-go="setup">Avanti</button>
+        <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+
+    <!-- SETUP -->
+    <section class="screen" data-screen="setup">
+      <h2 id="setupTitle">Prepara la sessione</h2>
+      <div id="durationGroup">
+        <p class="label">Durata</p>
+        <div class="seg" id="duration">
+          <button data-v="180">3 min</button>
+          <button data-v="300" class="on">5 min</button>
+          <button data-v="600">10 min</button>
+        </div>
+      </div>
+      <p class="label">Modalità</p>
+      <div class="seg" id="mode">
+        <button data-v="belly" class="on">Telefono sulla pancia</button>
+        <button data-v="guide">Solo guida</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="voice" checked> Voce guida</label>
+      <label class="toggle"><input type="checkbox" id="sound" checked> Suono del fiume</label>
+      <p class="hint" id="modeHint"></p>
+      <div class="actions">
+        <button class="btn primary" id="startBtn">Inizia</button>
+        <button class="btn ghost" data-go="checkin">Indietro</button>
+      </div>
+    </section>
+
+    <!-- SESSION -->
+    <section class="screen session" data-screen="session">
+      <div class="hud">
+        <span id="timeLeft">5:00</span>
+        <div class="calm-meter" title="Sintonia"><div id="calmBar"></div></div>
+      </div>
+      <div class="phase" id="phase">Preparati</div>
+      <p class="sensor-hint" id="sensorHint"></p>
+      <svg id="trace" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true">
+        <path id="tracePacer" />
+        <path id="traceBreath" />
+      </svg>
+      <button class="btn ghost small" id="stopBtn">Termina</button>
+    </section>
+
+    <!-- CHECK-OUT -->
+    <section class="screen" data-screen="checkout">
+      <h2>E adesso?</h2>
+      <label class="slider">
+        <span>Stress <output id="stressAfterOut">5</output></span>
+        <input type="range" id="stressAfter" min="0" max="10" value="5">
+        <span class="scale"><i>calmo</i><i>al limite</i></span>
+      </label>
+      <label class="slider">
+        <span>Pancia <output id="gutAfterOut">5</output></span>
+        <input type="range" id="gutAfter" min="0" max="10" value="5">
+        <span class="scale"><i>tranquilla</i><i>molto fastidio</i></span>
+      </label>
+      <div class="actions">
+        <button class="btn primary" id="saveBtn">Salva nel diario</button>
+      </div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section class="screen" data-screen="summary">
+      <h2>Fatto.</h2>
+      <div id="summaryBody"></div>
+      <div class="actions">
+        <button class="btn primary" data-go="home">Torna all'inizio</button>
+        <button class="btn ghost" data-go="diary">Apri il diario</button>
+      </div>
+    </section>
+
+    <!-- DIARY -->
+    <section class="screen" data-screen="diary">
+      <h2>Diario</h2>
+      <div id="diaryBody"></div>
+      <div class="actions">
+        <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
