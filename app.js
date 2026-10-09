@@ -557,6 +557,7 @@ const river = new River($('#river'));
 const idlePacer = new Pacer(PATTERNS.idle);
 
 function show(name) {
+  document.body.dataset.view = name;
   $$('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
   if (name === 'home') renderHome();
   if (name === 'diary') renderDiary();
@@ -1283,7 +1284,33 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (state.session) requestWakeLock();
   else if ($('[data-screen="home"]').classList.contains('active')) renderHome(); // e.g. reopened next morning
+  checkForUpdate();
 });
+
+// ---------------------------------------------------------------------------
+// Updates. The deploy workflow replaces __BUILD__ below and writes the same
+// commit id to version.json; when they differ, a newer version is online.
+// Locally the placeholder stays and the check is skipped.
+// ---------------------------------------------------------------------------
+
+const BUILD = '__BUILD__';
+
+async function checkForUpdate() {
+  if (BUILD.startsWith('__')) return;
+  try {
+    const res = await fetch('version.json', { cache: 'no-store' });
+    const { build } = await res.json();
+    if (build && build !== BUILD) $('#updateBar').hidden = false;
+  } catch { /* offline: try again next time */ }
+}
+
+$('#updateBtn').addEventListener('click', async () => {
+  $('#updateBtn').disabled = true;
+  try { await (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* reload anyway */ }
+  location.reload();
+});
+
+$('#version').textContent = BUILD.startsWith('__') ? 'Versione di sviluppo' : `Versione ${BUILD}`;
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -1291,6 +1318,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 
 // Other scripts (hrv.js, report.js) load after this one; start once all are in.
 document.addEventListener('DOMContentLoaded', () => {
-  renderHome();
+  show('home');
   requestAnimationFrame(frame);
+  checkForUpdate();
 });

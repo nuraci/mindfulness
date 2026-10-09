@@ -302,3 +302,31 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
   .report .trend { max-width: 560px; }
   .legend i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Update banner: never shown while practising or measuring */
+.update-bar {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 4;
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 14px;
+  background: #13303a;
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  font-size: 0.92rem;
+}
+.update-bar[hidden],
+body[data-view="session"] .update-bar,
+body[data-view="anchor"] .update-bar,
+body[data-view="hrv"] .update-bar,
+body[data-view="night"] .update-bar { display: none; }
+
+.version { color: var(--muted); font-size: 0.75rem; text-align: center; margin: 0; opacity: 0.7; }

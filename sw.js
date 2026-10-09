@@ -1,6 +1,6 @@
 // Network-first so updates pushed to GitHub Pages show up right away; the cache
 // is only a fallback for offline use (e.g. in bed with flaky Wi-Fi).
-const CACHE = 'fluire-v5';
+const CACHE = 'fluire-v6';
 const FILES = ['./', 'index.html', 'styles.css', 'program.js', 'app.js', 'hrv.js', 'anchor.js', 'report.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -18,7 +18,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
+    // no-cache: revalidate with the server instead of trusting the HTTP cache
+    // (GitHub Pages allows 10 minutes), so a new deploy shows up at once.
+    fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
