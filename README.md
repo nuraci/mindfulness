@@ -131,13 +131,13 @@ the cache is only used offline.
 
 ### Updates
 
-The deploy workflow stamps each build: it writes the short commit id to
-`version.json` and replaces the `__BUILD__` placeholder in `app.js`. On start
-and whenever the app comes back to the foreground, it fetches `version.json`
-(no-store); if the id differs, an "update available" bar appears (never during
-a session, the anchor, an HRV reading or the night screen). The build id is
-shown at the bottom of the home screen. Run locally, the placeholder stays and
-the check is skipped.
+On start the app records a fingerprint of each of its files (ETag /
+Last-Modified from a `HEAD` request, or a content hash if the server sends
+neither). Whenever it comes back to the foreground it checks again; any
+difference shows an "update available" bar (never during a session, the
+anchor, an HRV reading or the night screen). This works whatever publishes the
+site — GitHub Pages' branch build and the Actions workflow both deploy here.
+The home screen shows when the loaded version was published.
 
 ## How the breath detection works
 

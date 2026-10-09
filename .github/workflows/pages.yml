@@ -24,12 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      # Stamp the build so the app can tell when a newer version is online.
-      - name: Stamp build
-        run: |
-          build="${GITHUB_SHA::7}"
-          echo "{\"build\": \"$build\"}" > version.json
-          sed -i "s/__BUILD__/$build/" app.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

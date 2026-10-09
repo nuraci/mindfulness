@@ -1288,19 +1288,43 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Updates. The deploy workflow replaces __BUILD__ below and writes the same
-// commit id to version.json; when they differ, a newer version is online.
-// Locally the placeholder stays and the check is skipped.
+// Updates. Works however the site is published: at start the app notes each
+// file's fingerprint (ETag / Last-Modified, or a hash of the content when the
+// server sends neither); when it comes back to the foreground it checks again,
+// and any difference means a newer version is online. A PWA on Android can sit
+// in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const BUILD = '__BUILD__';
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'report.js', 'styles.css'];
+
+async function fingerprint(file) {
+  const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });
+  if (!head.ok) throw new Error(file);
+  const etag = head.headers.get('etag');
+  const modified = head.headers.get('last-modified');
+  if (etag || modified) return { sig: `${etag}|${modified}`, modified: modified ? Date.parse(modified) : 0 };
+  const text = await (await fetch(file, { cache: 'no-store' })).text();
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (Math.imul(h, 31) + text.charCodeAt(i)) | 0;
+  return { sig: String(h), modified: 0 };
+}
+
+let loadedPrints = null;
 
 async function checkForUpdate() {
-  if (BUILD.startsWith('__')) return;
+  if (!location.protocol.startsWith('http')) return;
   try {
-    const res = await fetch('version.json', { cache: 'no-store' });
-    const { build } = await res.json();
-    if (build && build !== BUILD) $('#updateBar').hidden = false;
+    const prints = await Promise.all(APP_FILES.map(fingerprint));
+    if (!loadedPrints) {
+      loadedPrints = prints;
+      const newest = Math.max(...prints.map((p) => p.modified));
+      if (newest) {
+        const d = new Date(newest);
+        $('#version').textContent = `Aggiornata il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+      }
+      return;
+    }
+    if (prints.some((p, i) => p.sig !== loadedPrints[i].sig)) $('#updateBar').hidden = false;
   } catch { /* offline: try again next time */ }
 }
 
@@ -1309,8 +1333,6 @@ $('#updateBtn').addEventListener('click', async () => {
   try { await (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* reload anyway */ }
   location.reload();
 });
-
-$('#version').textContent = BUILD.startsWith('__') ? 'Versione di sviluppo' : `Versione ${BUILD}`;
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
