@@ -18,10 +18,23 @@ practice lead to better mornings?).
   10 by default). Longer sessions drift into a body scan and end with 90 s of
   unguided breathing, no chimes, so you can fall asleep. No questions
   afterwards: the session saves itself and the sound fades out.
-- **Morning — measure.** A 10-second check-in: gut discomfort and sleep
-  quality. This is the outcome measure, taken when symptoms usually show.
+- **Morning — measure.** A quick check-in: gut discomfort and sleep quality,
+  plus optional taps for last night's dinner (late, heavy, legumes, dairy,
+  fried, alcohol, garlic/onion, bread/pasta, spicy, sweets) and the Bristol
+  stool scale. This is the outcome measure, taken when symptoms usually show.
+  Dinner is asked every morning, not only after practice, so the comparison
+  stays fair.
 - **Results.** Morning gut scores over the last 28 days, each point marked by
   whether the evening before had practice, plus the average of the two groups.
+- **Dinner → morning.** The diary flags dinner items that go with a worse
+  morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
+  hint to discuss with a doctor, not as proof.
+- **Doctor's summary.** A printable page (print or "Save as PDF") with key
+  numbers, the trend chart, Bristol distribution, dinner comparisons and the
+  raw morning log. A light print stylesheet makes it readable on paper.
+- **Backup.** Export everything to a JSON file and import it back. Import
+  merges (lists de-duplicated by timestamp), so restoring an old backup never
+  loses newer entries. Home nudges for a backup every two weeks.
 - **Reminders.** An `.ics` file with two daily events for 42 days (evening
   session, morning check-in). Works with any phone calendar; no server needed.
 
@@ -85,6 +98,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | --- | --- |
 | `index.html` | Screens: home, check-in, setup, session, check-out, summary, night, diary |
 | `program.js` | The six-week programme: per-week scripts, colours, pads, daytime practice |
+| `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
 | | `BreathSensor` — accelerometer → detrended breath signal → lag-tolerant correlation with the pacer |

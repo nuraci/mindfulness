@@ -22,6 +22,7 @@
         <p class="tagline">Respira con la pancia. Guarda il fiume schiarirsi.</p>
       </header>
 
+      <div id="backupNudge"></div>
       <div id="morningCard"></div>
       <div id="programCard"></div>
       <div id="resultsCard"></div>
@@ -162,13 +163,30 @@
     <section class="screen" data-screen="diary">
       <h2>Diario</h2>
       <div id="diaryBody"></div>
+      <div class="card">
+        <span class="kicker">I tuoi dati</span>
+        <p class="hint" id="backupInfo"></p>
+        <button class="btn" data-go="report">Riepilogo per il medico</button>
+        <button class="btn" id="exportBtn">Esporta backup</button>
+        <label class="btn ghost file-btn">Importa backup<input type="file" id="importFile" accept="application/json,.json" hidden></label>
+      </div>
       <div class="actions">
         <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+
+    <!-- REPORT: printable summary for a doctor -->
+    <section class="screen report" data-screen="report">
+      <div id="reportBody"></div>
+      <div class="actions no-print">
+        <button class="btn primary" id="printBtn">Stampa o salva PDF</button>
+        <button class="btn ghost" data-go="diary">Indietro</button>
       </div>
     </section>
   </main>
 
   <script src="program.js"></script>
   <script src="app.js"></script>
+  <script src="report.js"></script>
 </body>
 </html>

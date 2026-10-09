@@ -12,11 +12,12 @@ const now = () => performance.now() / 1000;
 
 const KEYS = {
   sessions: 'fluire.sessions.v1',   // [{ ts, flow, week?, mode, seconds, sync, stressBefore, gutBefore, stressAfter?, gutAfter?, tags }]
-  mornings: 'fluire.mornings.v1',   // [{ ts, gut, sleep }]
+  mornings: 'fluire.mornings.v1',   // [{ ts, gut, sleep, bristol?, dinner? }]
   program: 'fluire.program.v1',     // { started, seenWeek }
   anchors: 'fluire.anchors.v1',     // [ts] daytime practice done
   reminders: 'fluire.reminders.v1', // { evening: 'HH:MM', morning: 'HH:MM' }
   voice: 'fluire.voice.v1',         // name of the chosen system voice
+  backup: 'fluire.backup.v1',       // ts of the last export
 };
 
 const store = {
@@ -35,6 +36,44 @@ const store = {
 };
 
 const TAGS = ['Lavoro', 'Cibo', 'Sonno scarso', 'Ansia', 'Caffè', 'Ciclo', 'Viaggio', 'Conflitti'];
+
+// Asked at the morning check-in about the dinner before: morning symptoms are
+// the ones most likely to depend on it, and asking every morning (not only on
+// practice evenings) keeps the comparison fair.
+const DINNER = ['Cena tardi', 'Abbondante', 'Legumi', 'Latticini', 'Fritti o grassi', 'Alcol', 'Aglio o cipolla', 'Pane o pasta', 'Piccante', 'Dolci'];
+
+// Bristol stool scale, the standard way to describe stool form to a doctor.
+const BRISTOL = [
+  'Grumi duri separati',
+  'A salsiccia, grumosa',
+  'A salsiccia, con crepe',
+  'Liscia e morbida',
+  'Pezzi morbidi',
+  'Pastosa, frastagliata',
+  'Liquida',
+];
+
+function downloadFile(name, type, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function chipGroup(items, selected) {
+  return items.map((t) => `<button type="button" class="chip${selected.has(t) ? ' on' : ''}" data-v="${t}">${t}</button>`).join('');
+}
+function bindChips(root, selected) {
+  root.querySelectorAll('.chip').forEach((b) =>
+    b.addEventListener('click', () => {
+      const v = b.dataset.v;
+      selected.has(v) ? selected.delete(v) : selected.add(v);
+      b.classList.toggle('on', selected.has(v));
+    })
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Breathing patterns
@@ -520,6 +559,7 @@ function show(name) {
   if (name === 'home') renderHome();
   if (name === 'diary') renderDiary();
   if (name === 'setup') renderSetup();
+  if (name === 'report') renderReport();
   window.scrollTo(0, 0);
 }
 
@@ -592,9 +632,24 @@ function renderSetup() {
 function renderHome() {
   const st = programStatus();
   river.tint = st ? PROGRAM[st.week - 1].tint : DEFAULT_TINT;
+  renderBackupNudge();
   renderMorningCard(st);
   renderProgramCard(st);
   renderResults($('#resultsCard'), true);
+}
+
+// Data lives only in this browser; nudge towards an export now and then.
+function renderBackupNudge() {
+  const el = $('#backupNudge');
+  const count = store.get(KEYS.sessions, []).length + store.get(KEYS.mornings, []).length;
+  const last = store.get(KEYS.backup, 0);
+  if (count < 10 || Date.now() - last < 14 * 24 * HOUR) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="card">
+      <p>${last ? 'Sono passate più di due settimane dall’ultimo backup.' : 'I tuoi dati sono salvati solo su questo telefono.'} Un backup richiede un tocco.</p>
+      <button class="btn small" id="nudgeExport">Esporta backup</button>
+    </div>`;
+  $('#nudgeExport').addEventListener('click', () => { exportBackup(); renderBackupNudge(); });
 }
 
 function renderMorningCard(st) {
@@ -616,12 +671,30 @@ function renderMorningCard(st) {
         <input type="range" id="mSleep" min="0" max="10" value="6">
         <span class="scale"><i>pessimo</i><i>ottimo</i></span>
       </label>
+      <p class="label">Ieri a cena <small>(facoltativo)</small></p>
+      <div class="chips" id="mDinner">${chipGroup(DINNER, new Set())}</div>
+      <p class="label">Evacuazione, scala di Bristol <small>(facoltativo)</small></p>
+      <div class="bristol" id="mBristol">
+        ${BRISTOL.map((_, i) => `<button type="button" data-v="${i + 1}">${i + 1}</button>`).join('')}
+      </div>
+      <p class="hint" id="mBristolHint">1 = dura, 7 = liquida. 3–4 è l’ideale.</p>
       <button class="btn primary" id="mSave">Salva</button>
     </div>`;
   bindSlider($('#mGut'));
   bindSlider($('#mSleep'));
+  const dinner = new Set();
+  bindChips($('#mDinner'), dinner);
+  let bristol = null;
+  $$('#mBristol button').forEach((b) =>
+    b.addEventListener('click', () => {
+      const v = +b.dataset.v;
+      bristol = bristol === v ? null : v;
+      $$('#mBristol button').forEach((x) => x.classList.toggle('on', +x.dataset.v === bristol));
+      $('#mBristolHint').textContent = bristol ? `Tipo ${bristol}: ${BRISTOL[bristol - 1].toLowerCase()}.` : '1 = dura, 7 = liquida. 3–4 è l’ideale.';
+    })
+  );
   $('#mSave').addEventListener('click', () => {
-    store.push(KEYS.mornings, { ts: Date.now(), gut: +$('#mGut').value, sleep: +$('#mSleep').value });
+    store.push(KEYS.mornings, { ts: Date.now(), gut: +$('#mGut').value, sleep: +$('#mSleep').value, bristol, dinner: [...dinner] });
     renderHome();
   });
 }
@@ -713,15 +786,15 @@ function renderResults(el, compact) {
   });
 }
 
-// One series (morning gut 0-10) over a 28-day window; filled dot = practised the
-// evening before, hollow = not. Higher is worse, so the axis says so.
-function trendSvg(mornings) {
+// One series (morning gut 0-10) over the last `days` days; filled dot = practised
+// the evening before, hollow = not. Higher is worse, so the axis says so.
+function trendSvg(mornings, days = 28) {
   const W = 300, H = 120, L = 22, R = 6, T = 8, B = 18;
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   const DAY = 24 * HOUR;
-  const start = today.getTime() - 27 * DAY;
-  const x = (ts) => L + ((ts - start) / (27 * DAY)) * (W - L - R);
+  const start = today.getTime() - (days - 1) * DAY;
+  const x = (ts) => L + ((ts - start) / ((days - 1) * DAY)) * (W - L - R);
   const y = (v) => T + (1 - v / 10) * (H - T - B);
 
   // One point per day: the first check-in of that day.
@@ -741,13 +814,26 @@ function trendSvg(mornings) {
   const line = pts.length > 1 ? `<path class="line" d="${pts.map(([t, m], i) => `${i ? 'L' : 'M'}${x(t).toFixed(1)},${y(m.gut).toFixed(1)}`).join('')}"/>` : '';
   const dots = pts
     .map(([t, m]) => {
-      const label = `${new Date(m.ts).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })} · pancia ${m.gut} · sonno ${m.sleep} · ${m.practiced ? 'sessione la sera prima' : 'nessuna sessione'}`;
+      const label = `${new Date(m.ts).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })} · pancia ${m.gut} · sonno ${m.sleep}${m.bristol ? ` · Bristol ${m.bristol}` : ''} · ${m.practiced ? 'sessione la sera prima' : 'nessuna sessione'}`;
       return `<circle class="dot ${m.practiced ? 'with' : 'without'}" cx="${x(t).toFixed(1)}" cy="${y(m.gut).toFixed(1)}" r="4"/>
         <circle class="hit" cx="${x(t).toFixed(1)}" cy="${y(m.gut).toFixed(1)}" r="11" data-label="${label}"/>`;
     })
     .join('');
-  return `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Fastidio alla pancia al mattino, da 0 a 10, negli ultimi 28 giorni">
-    <text class="axis" x="${L}" y="${T - 1}">fastidio</text>${grid}${xlabels}${line}${dots}</svg>`;
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Fastidio alla pancia al mattino, da 0 a 10, negli ultimi ${days} giorni">
+    <text class="axis" x="${L + 4}" y="${T + 10}">fastidio</text>${grid}${xlabels}${line}${dots}</svg>`;
+}
+
+// Which dinner items go with a worse gut the next morning? Only items with
+// enough mornings on both sides are compared. A hint, not proof.
+function dinnerFactors(mornings) {
+  return DINNER.map((f) => {
+    const yes = mornings.filter((m) => m.dinner?.includes(f));
+    const no = mornings.filter((m) => m.dinner && !m.dinner.includes(f));
+    return { f, nYes: yes.length, nNo: no.length, yes: avg(yes.map((m) => m.gut)), no: avg(no.map((m) => m.gut)) };
+  })
+    .filter((x) => x.nYes >= 3 && x.nNo >= 3)
+    .map((x) => ({ ...x, diff: x.yes - x.no }))
+    .sort((a, b) => b.diff - a.diff);
 }
 
 // ---------------------------------------------------------------------------
@@ -801,12 +887,7 @@ $('#remBtn').addEventListener('click', () => {
     'END:VCALENDAR',
   ].join('\r\n');
 
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
-  a.download = 'fluire-promemoria.ics';
-  document.body.append(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  downloadFile('fluire-promemoria.ics', 'text/calendar', ics);
 });
 
 // ---------------------------------------------------------------------------
@@ -1096,6 +1177,11 @@ function renderDiary() {
   const sleepWith = mornings.filter((m) => m.practiced), sleepWithout = mornings.filter((m) => !m.practiced);
   if (sleepWith.length >= 3 && sleepWithout.length >= 3) {
     insights.push(`Sonno medio dopo una sera di pratica: <strong>${avg(sleepWith.map((m) => m.sleep)).toFixed(1)}</strong>, altre notti: <strong>${avg(sleepWithout.map((m) => m.sleep)).toFixed(1)}</strong>.`);
+  }
+  const suspects = dinnerFactors(mornings).filter((x) => x.diff >= 1);
+  if (suspects.length) {
+    const list = suspects.slice(0, 3).map((x) => `<strong>${x.f.toLowerCase()}</strong> (${x.yes.toFixed(1)} contro ${x.no.toFixed(1)})`).join(', ');
+    insights.push(`Mattine più difficili dopo una cena con ${list}. È un indizio da osservare, non una prova: parlane con il medico prima di eliminare cibi.`);
   }
   const syncs = sessions.filter((e) => e.sync != null).slice(-5);
   if (syncs.length >= 2) {

@@ -224,3 +224,37 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 .entries .meta { color: var(--muted); font-size: 0.8rem; }
 
 .insight { border-left: 3px solid var(--accent); padding: 4px 0 4px 10px; margin: 0; color: var(--text); font-size: 0.92rem; line-height: 1.45; }
+
+.bristol { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.bristol button {
+  font: inherit;
+  padding: 9px 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.bristol button.on { background: rgba(95, 211, 198, 0.18); border-color: var(--accent); }
+
+.file-btn { text-align: center; }
+
+/* Report */
+.report table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.report th, .report td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.report table.compact th, .report table.compact td { text-align: center; }
+.report .log { font-size: 0.78rem; }
+.report h3 { margin: 8px 0 0; font-size: 1rem; font-weight: 600; }
+.report .note { color: var(--muted); font-size: 0.8rem; margin: 0; line-height: 1.4; }
+.report .trend { max-height: 220px; }
+
+@media print {
+  :root { --text: #111; --muted: #555; --line: #ccc; --accent: #0b7a6e; --bg: #fff; color-scheme: light; }
+  html, body { background: #fff; color: var(--text); }
+  #river, .no-print, .screen:not(.report) { display: none !important; }
+  main { padding: 0; display: block; }
+  .screen.report { display: flex !important; max-width: none; background: none; border: 0; padding: 0; backdrop-filter: none; }
+  .report tr { break-inside: avoid; }
+  .report .trend { max-width: 560px; }
+  .legend i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
