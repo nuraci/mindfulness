@@ -14,7 +14,7 @@
 
 // OAuth client id from Google Cloud (public by design, not a secret).
 // Empty = feature hidden.
-const GOOGLE_CLIENT_ID = '';
+const GOOGLE_CLIENT_ID = '472858406414-hfnp2um1jg13srrpdmp4cqski7jci3gl.apps.googleusercontent.com';
 
 const SYNC_FILE = 'fluire-data.json';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
