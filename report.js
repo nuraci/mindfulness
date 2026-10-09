@@ -9,30 +9,38 @@
 
 const LIST_KEYS = ['sessions', 'mornings', 'anchors', 'hrv', 'thoughts', 'reflections'];
 
-function exportBackup() {
+// Everything Fluire stores, minus the keys named in `skip`.
+function collectData(skip = []) {
   const data = {};
   for (const [name, key] of Object.entries(KEYS)) {
-    if (name !== 'backup') data[name] = store.get(key, null);
+    if (!skip.includes(name)) data[name] = store.get(key, null);
   }
+  return { app: 'fluire', version: 1, exported: Date.now(), data };
+}
+
+function exportBackup() {
   const stamp = new Date().toISOString().slice(0, 10);
-  downloadFile(`fluire-backup-${stamp}.json`, 'application/json', JSON.stringify({ app: 'fluire', version: 1, exported: Date.now(), data }, null, 1));
+  downloadFile(`fluire-backup-${stamp}.json`, 'application/json', JSON.stringify(collectData(['backup', 'sync']), null, 1));
   store.set(KEYS.backup, Date.now());
   renderBackupInfo();
 }
 
 // Merges rather than replaces, so importing an old backup never loses newer
 // entries. Lists are de-duplicated by timestamp.
-function importBackup(json) {
+function importBackup(json, skip = []) {
   if (!json || json.app !== 'fluire' || !json.data) throw new Error('not a Fluire backup');
   let added = 0;
   for (const [name, key] of Object.entries(KEYS)) {
     const incoming = json.data[name];
-    if (incoming == null) continue;
+    if (incoming == null || skip.includes(name)) continue;
     if (LIST_KEYS.includes(name)) {
       const current = store.get(key, []);
       const tsOf = (x) => (typeof x === 'number' ? x : x.ts);
-      const seen = new Set(current.map(tsOf));
-      const fresh = incoming.filter((x) => !seen.has(tsOf(x)));
+      const byTs = new Map(current.map((x) => [tsOf(x), x]));
+      const fresh = incoming.filter((x) => !byTs.has(tsOf(x)));
+      // A parked thought marked as seen on one device is seen everywhere.
+      if (name === 'thoughts') for (const x of incoming) if (x.seen && byTs.has(x.ts)) byTs.get(x.ts).seen = true;
+      if (!fresh.length && name !== 'thoughts') continue;
       added += fresh.length;
       store.set(key, current.concat(fresh).sort((a, b) => tsOf(a) - tsOf(b)));
     } else if (name === 'program') {

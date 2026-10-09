@@ -122,6 +122,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `hrv.js` | Camera photoplethysmography: `PPG.analyse` (pure, tested) and the measurement screen |
 | `anchor.js` | Vibration-guided breathing for the daytime anchor |
 | `reflect.js` | Thought parking before the evening session and the weekly summary |
+| `sync.js` | Optional Google Drive sync (appDataFolder) |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
@@ -148,6 +149,28 @@ difference shows an "update available" bar (never during a session, the
 anchor, an HRV reading or the night screen). This works whatever publishes the
 site — GitHub Pages' branch build and the Actions workflow both deploy here.
 The home screen shows when the loaded version was published.
+
+### Google Drive sync (optional)
+
+`sync.js` keeps devices in step through the user's own Google Drive, with no
+server. Data lives in a single `fluire-data.json` in the Drive
+**appDataFolder** (hidden, private to the app; scope `drive.appdata`, so the
+app cannot see any other file). Sign-in uses Google Identity Services' token
+client: tokens last about an hour, then a tap renews them, since Google only
+opens its window in response to a user gesture.
+
+A sync downloads the Drive copy, merges it with the same rules as a backup
+import (lists de-duplicated by timestamp, nothing lost), and uploads the
+result. It runs after local changes (debounced), on start and when the app
+returns to the foreground — whenever the token is valid. Device-specific
+settings (voice, backup date, dismissed prompts) are not synced. The service
+worker only handles same-origin requests, so Google responses are never cached.
+
+To enable it, create an OAuth client in Google Cloud (type "Web application",
+authorised JavaScript origin `https://nuraci.github.io`, Drive API enabled,
+scope `drive.appdata`, your account as a test user) and put its client id in
+`GOOGLE_CLIENT_ID` at the top of `sync.js`. With an empty id the feature is
+hidden.
 
 ## How the breath detection works
 

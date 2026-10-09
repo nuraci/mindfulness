@@ -23,6 +23,7 @@ const KEYS = {
   thoughts: 'fluire.thoughts.v1',   // [{ ts, worries: [], todo: [], seen }] parked before the evening session
   reflections: 'fluire.reflections.v1', // [{ ts, week, q, a }] answers to the weekly question
   weekHidden: 'fluire.weekhidden.v1',   // week key of the last weekly summary closed on home
+  sync: 'fluire.sync.v1',           // { linked, last } Google Drive sync state on this device
 };
 
 const store = {
@@ -1308,7 +1309,7 @@ document.addEventListener('visibilitychange', () => {
 // in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'reflect.js', 'report.js', 'styles.css'];
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
 
 async function fingerprint(file) {
   const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });

@@ -354,3 +354,18 @@ body[data-view="night"] .update-bar { display: none; }
 .parked { margin: 0; padding-left: 20px; line-height: 1.6; font-size: 0.93rem; }
 .week-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
 .muted { color: var(--muted); }
+
+/* Drive sync status on home */
+.sync-line {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.sync-line[hidden] { display: none; }
+.sync-line.attention { color: var(--warn); border-color: var(--warn); }

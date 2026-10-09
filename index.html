@@ -21,6 +21,7 @@
         <h1>Fluire</h1>
         <p class="tagline">Respira con la pancia. Guarda il fiume schiarirsi.</p>
       </header>
+      <button class="sync-line" id="syncLine" hidden></button>
 
       <div id="backupNudge"></div>
       <div id="morningCard"></div>
@@ -195,6 +196,13 @@
         <button class="btn" id="exportBtn">Esporta backup</button>
         <label class="btn ghost file-btn">Importa backup<input type="file" id="importFile" accept="application/json,.json" hidden></label>
       </div>
+      <div class="card" id="syncCard" hidden>
+        <span class="kicker">Google Drive</span>
+        <p class="hint" id="syncInfo"></p>
+        <button class="btn primary" id="syncLink">Collega Google Drive</button>
+        <button class="btn" id="syncNow" hidden>Sincronizza ora</button>
+        <button class="btn ghost small" id="syncUnlink" hidden>Scollega questo dispositivo</button>
+      </div>
       <div class="actions">
         <button class="btn ghost" data-go="home">Indietro</button>
       </div>
@@ -262,5 +270,6 @@
   <script src="anchor.js"></script>
   <script src="reflect.js"></script>
   <script src="report.js"></script>
+  <script src="sync.js"></script>
 </body>
 </html>
