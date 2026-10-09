@@ -89,7 +89,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | | `Pacer` — breathing patterns as piecewise eased curves |
 | | `BreathSensor` — accelerometer → detrended breath signal → lag-tolerant correlation with the pacer |
 | | `Soundscape` — Web Audio brown-noise "water" that swells with the breath + harmonic pad driven by sync |
-| | `Guide` — timed voice script |
+| | `Guide` — timed voice script, spoken sentence by sentence with pauses; picks the best Italian system voice (user can override) |
 | | `River` — canvas particle river; turbulence and colour driven by calm |
 | `styles.css` | Dark, calm theme |
 | `sw.js`, `manifest.json`, `icon.svg` | Offline support and install metadata |

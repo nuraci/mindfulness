@@ -178,6 +178,9 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 .toggle { display: flex; align-items: center; gap: 10px; }
 .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
 
+.voice-pick { display: flex; gap: 8px; }
+.voice-pick select { flex: 1; min-width: 0; font: inherit; font-size: 0.9rem; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+
 .hint { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin: 0; }
 
 /* Session */

@@ -16,6 +16,7 @@ const KEYS = {
   program: 'fluire.program.v1',     // { started, seenWeek }
   anchors: 'fluire.anchors.v1',     // [ts] daytime practice done
   reminders: 'fluire.reminders.v1', // { evening: 'HH:MM', morning: 'HH:MM' }
+  voice: 'fluire.voice.v1',         // name of the chosen system voice
 };
 
 const store = {
@@ -300,28 +301,75 @@ const SCRIPTS = {
 class Guide {
   constructor(enabled) {
     this.enabled = enabled && 'speechSynthesis' in window;
-    this.queue = [];
-    if (!this.enabled) return;
-    const voices = speechSynthesis.getVoices();
-    this.voice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('it')) || null;
+    this.queue = [];     // timed script lines, not yet due
+    this.sentences = []; // due text, spoken one sentence at a time
+    this.speaking = false;
+    this.timer = null;
+    if (this.enabled) this.voice = Guide.chosenVoice();
   }
+
+  static italianVoices() {
+    if (!('speechSynthesis' in window)) return [];
+    return speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().replace('_', '-').startsWith('it'));
+  }
+
+  // Higher-quality system voices usually advertise it in their name.
+  static score(v) {
+    const n = v.name.toLowerCase();
+    let s = 0;
+    if (/premium|enhanced|natural|neural|migliorat|plus|wavenet/.test(n)) s += 10;
+    if (/google/.test(n)) s += 5;
+    if (/alice|federica|emma|paola|luca|isabella|elsa|diego/.test(n)) s += 2;
+    if (v.localService) s += 1; // works offline, in bed
+    if (/compact|espeak/.test(n)) s -= 10;
+    return s;
+  }
+
+  static chosenVoice() {
+    const voices = Guide.italianVoices();
+    const saved = store.get(KEYS.voice, null);
+    return voices.find((v) => v.name === saved) || voices.sort((a, b) => Guide.score(b) - Guide.score(a))[0] || null;
+  }
+
   plan(lines, duration, endLine) {
     this.queue = lines.filter(([at]) => at <= duration - 40).map(([at, text]) => ({ at, text }));
     if (endLine) this.queue.push({ at: Math.max(0, duration - 35), text: endLine });
   }
+
+  // Sentences are spoken separately with a pause in between: slower, calmer,
+  // and it avoids browsers cutting off long utterances.
   say(text) {
     if (!this.enabled) return;
+    this.sentences.push(...text.split(/(?<=[.!?:])\s+/).filter(Boolean));
+    if (!this.speaking) this.next();
+  }
+
+  next() {
+    const text = this.sentences.shift();
+    if (!text) { this.speaking = false; return; }
+    this.speaking = true;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'it-IT';
-    u.rate = 0.88;
-    u.pitch = 0.95;
+    u.rate = 0.82;
+    u.pitch = 1;
     if (this.voice) u.voice = this.voice;
+    const pause = /[.!?]$/.test(text) ? 900 : 500;
+    u.onend = u.onerror = () => { this.timer = setTimeout(() => this.next(), pause); };
+    this.current = u; // keep a reference, or some browsers never fire onend
     speechSynthesis.speak(u);
   }
+
   tick(elapsed) {
     while (this.queue.length && this.queue[0].at <= elapsed) this.say(this.queue.shift().text);
   }
-  stop() { if (this.enabled) speechSynthesis.cancel(); }
+
+  stop() {
+    if (!this.enabled) return;
+    this.sentences = [];
+    this.speaking = false;
+    clearTimeout(this.timer);
+    speechSynthesis.cancel();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -762,6 +810,32 @@ $('#remBtn').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Voice picker. Voices load asynchronously on most browsers.
+// ---------------------------------------------------------------------------
+
+function renderVoices() {
+  const sel = $('#voiceSel');
+  const voices = Guide.italianVoices().sort((a, b) => Guide.score(b) - Guide.score(a));
+  $('#voicePick').style.display = voices.length ? '' : 'none';
+  const current = Guide.chosenVoice();
+  sel.innerHTML = voices
+    .map((v) => `<option ${v.name === current?.name ? 'selected' : ''}>${v.name.replace(/</g, '')}</option>`)
+    .join('');
+}
+
+if ('speechSynthesis' in window) {
+  speechSynthesis.addEventListener?.('voiceschanged', renderVoices);
+  renderVoices();
+}
+$('#voiceSel').addEventListener('change', (e) => store.set(KEYS.voice, e.target.value));
+let tester = null;
+$('#voiceTest').addEventListener('click', () => {
+  tester?.stop();
+  tester = new Guide(true);
+  tester.say('Buonasera. Lascia che il corpo si appoggi. Inspira con la pancia, ed espira piano.');
+});
+
+// ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
 
@@ -1075,7 +1149,6 @@ document.addEventListener('visibilitychange', () => {
   else if ($('[data-screen="home"]').classList.contains('active')) renderHome(); // e.g. reopened next morning
 });
 
-if ('speechSynthesis' in window) speechSynthesis.getVoices(); // warm up the voice list
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
