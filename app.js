@@ -24,6 +24,7 @@ const KEYS = {
   reflections: 'fluire.reflections.v1', // [{ ts, week, q, a }] answers to the weekly question
   weekHidden: 'fluire.weekhidden.v1',   // week key of the last weekly summary closed on home
   episodes: 'fluire.episodes.v1',   // [{ ts, types, intensity, context, after?, sos? }] gut discomfort as it happens
+  resonance: 'fluire.resonance.v1', // { ts, rate, results: [{ rate, amp }], use } personal breathing rate
   sync: 'fluire.sync.v1',           // { linked, last } Google Drive sync state on this device
 };
 
@@ -109,6 +110,19 @@ const PATTERNS = {
     { label: '', dur: 7, to: 0 },
   ],
 };
+
+// The personal resonance rate, once measured and enabled, replaces the
+// standard 4/6 and 5/7 rhythms (but not the SOS sighs). 40 % inhale, 60 % exhale.
+function breathPattern(name) {
+  const r = store.get(KEYS.resonance, null);
+  if (!r || !r.use || (name !== 'flow' && name !== 'deep')) return PATTERNS[name];
+  const cycle = 60 / r.rate;
+  const inhale = Math.round(cycle * 0.4 * 10) / 10;
+  return [
+    { label: 'Inspira con la pancia', dur: inhale, to: 1, cue: 'in' },
+    { label: 'Espira lentamente', dur: Math.round((cycle - inhale) * 10) / 10, to: 0, cue: 'out' },
+  ];
+}
 
 class Pacer {
   constructor(phases) {
@@ -647,6 +661,8 @@ function renderSetup() {
     ? 'SOS · sospiro fisiologico'
     : st ? `Settimana ${st.week} · ${PROGRAM[st.week - 1].title}` : 'Sessione libera';
   $('#durationGroup').style.display = sos || gutSos ? 'none' : '';
+  const res = store.get(KEYS.resonance, null);
+  $('#rhythmHint').textContent = !sos && res?.use ? `Ritmo: il tuo, ${String(res.rate).replace('.', ',')} respiri al minuto.` : '';
   $('#modeHint').textContent =
     state.mode === 'belly'
       ? 'Sdraiati e appoggia il telefono sulla pancia, sotto l’ombelico, con una mano sopra. Il telefono potrebbe chiederti il permesso di usare i sensori di movimento. Su iPhone togli la modalità silenziosa per sentire il suono.'
@@ -1034,7 +1050,7 @@ $('#startBtn').addEventListener('click', async () => {
 
   const t0 = now();
   state.session = {
-    pacer: new Pacer(PATTERNS[sos ? 'sos' : week ? week.pattern : 'flow']),
+    pacer: new Pacer(breathPattern(sos ? 'sos' : week ? week.pattern : 'flow')),
     week: st ? st.week : null,
     mode: sensor ? 'belly' : 'guide',
     duration,
@@ -1335,7 +1351,7 @@ document.addEventListener('visibilitychange', () => {
 // in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'episodes.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'episodes.js', 'resonance.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
 
 async function fingerprint(file) {
   const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });

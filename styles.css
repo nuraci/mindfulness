@@ -369,3 +369,22 @@ body[data-view="night"] .update-bar { display: none; }
 }
 .sync-line[hidden] { display: none; }
 .sync-line.attention { color: var(--warn); border-color: var(--warn); }
+
+/* Resonance test */
+.res-block { display: flex; flex-direction: column; gap: 14px; }
+.res-block[hidden] { display: none; }
+.res-stage { height: 200px; display: flex; align-items: center; justify-content: center; }
+.res-dot {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(95, 211, 198, 0.55), rgba(95, 211, 198, 0.05) 70%);
+  border: 1px solid rgba(95, 211, 198, 0.4);
+  transform: scale(0.45);
+}
+.res-phase { text-align: center; font-size: 1.6rem; font-weight: 300; margin: 0; min-height: 1.3em; }
+.res-progress { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+#resBar { height: 100%; width: 0; background: var(--accent); transition: width 0.5s; }
+.res-bar { fill: rgba(143, 168, 173, 0.45); }
+.res-bar.best { fill: var(--accent); }
+.res-val { fill: var(--text); font-size: 10px; }

@@ -55,6 +55,14 @@ practice lead to better mornings?).
   episodes come, the most frequent context, and episodes per day on days with
   vs without the daytime anchor. Also in the weekly summary and the doctor's
   summary.
+- **Personal breathing rate (resonance test).** Fingertip on the camera,
+  breathing along with a pacer at 6.5, 6, 5.5, 5 and 4.5 breaths/min (10 s to
+  adapt + 60 s recorded each, ~6 min). For each rate the app measures how much
+  the heart rate swings within a breath (respiratory sinus arrhythmia, max −
+  min of beat-to-beat heart rate per breath-long window, averaged); the rate
+  with the largest swing is the resonance frequency. Once saved, sessions and
+  the anchor breathe at that rate (40 % in, 60 % out) instead of 4/6 and 5/7;
+  the SOS sighs are unchanged. Losing the finger restarts only the current rate.
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.
@@ -132,6 +140,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `episodes.js` | Gut episode log, gut SOS follow-up and episode insights |
 | `reflect.js` | Thought parking before the evening session and the weekly summary |
 | `sync.js` | Optional Google Drive sync (appDataFolder) |
+| `resonance.js` | Resonance breathing test and its result chart |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
@@ -209,7 +218,9 @@ hidden.
    only with ≥ 30 valid beats and ≥ 70 % of intervals valid.
 
 `node tests/ppg.test.js` checks the analysis against synthetic pulse waves
-with known heart rate and RMSSD. With noisy signals RMSSD is biased upwards,
+with known heart rate and RMSSD, and checks that the resonance analysis finds
+the right rate for a synthetic person whose heart-rate swing peaks at 5.5
+breaths/min. With noisy signals RMSSD is biased upwards,
 which is why the quality gate matters.
 
 ## Disclaimer

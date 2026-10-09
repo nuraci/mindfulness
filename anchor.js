@@ -25,7 +25,7 @@ $$('#anchorCycles button').forEach((b) =>
 
 function anchorRhythm() {
   const st = programStatus();
-  const pattern = PATTERNS[st ? PROGRAM[st.week - 1].pattern : 'flow'];
+  const pattern = breathPattern(st ? PROGRAM[st.week - 1].pattern : 'flow');
   return { inhale: pattern[0].dur, exhale: pattern[1].dur };
 }
 

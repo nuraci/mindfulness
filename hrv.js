@@ -109,6 +109,8 @@ const PPG = (() => {
     return {
       wave: y,
       peaks,
+      ibis,
+      valid,
       n: kept.length,
       quality: ibis.length ? kept.length / ibis.length : 0,
       hr: kept.length ? 60000 / (kept.reduce((s, v) => s + v, 0) / kept.length) : null,
@@ -116,7 +118,25 @@ const PPG = (() => {
     };
   }
 
-  return { analyse, FS };
+  // Heart-rate swing with the breath (respiratory sinus arrhythmia): for each
+  // complete breathing cycle starting at `start` (seconds, same clock as the
+  // samples), the difference between the highest and lowest beat-to-beat heart
+  // rate; averaged over cycles. The breathing rate where this swing is largest
+  // is the person's resonance frequency.
+  function rsa(a, start, cycle) {
+    const pts = [];
+    for (let i = 0; i < a.ibis.length; i++) if (a.valid[i]) pts.push({ t: a.peaks[i + 1], hr: 60000 / a.ibis[i] });
+    if (!pts.length) return null;
+    const end = pts[pts.length - 1].t;
+    const amps = [];
+    for (let c0 = start; c0 + cycle <= end; c0 += cycle) {
+      const hr = pts.filter((p) => p.t >= c0 && p.t < c0 + cycle).map((p) => p.hr);
+      if (hr.length >= 3) amps.push(Math.max(...hr) - Math.min(...hr));
+    }
+    return amps.length >= 3 ? { amp: amps.reduce((x, y) => x + y, 0) / amps.length, cycles: amps.length } : null;
+  }
+
+  return { analyse, rsa, FS };
 })();
 
 if (typeof module !== 'undefined') module.exports = PPG;
@@ -124,6 +144,75 @@ if (typeof module !== 'undefined') module.exports = PPG;
 // ---------------------------------------------------------------------------
 // Measurement screen (browser only)
 // ---------------------------------------------------------------------------
+
+// The camera as a pulse sensor, shared by the HRV reading and the resonance
+// test: calls onFrame(t, red, covered) for every new video frame.
+class PulseCamera {
+  constructor(video) {
+    this.video = video;
+    this.stream = null;
+    this.running = false;
+    this.onFrame = null;
+    this.grab = document.createElement('canvas');
+    this.grab.width = 40;
+    this.grab.height = 30;
+    this.gctx = this.grab.getContext('2d', { willReadFrequently: true });
+  }
+
+  // Resolves with whether the flash could be turned on.
+  async start() {
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } },
+      audio: false,
+    });
+    this.video.srcObject = this.stream;
+    await this.video.play();
+    const track = this.stream.getVideoTracks()[0];
+    let torch = false;
+    try {
+      if (track.getCapabilities?.().torch) {
+        await track.applyConstraints({ advanced: [{ torch: true }] });
+        torch = true;
+      }
+    } catch { torch = false; }
+    this.running = true;
+    this.loop();
+    return torch;
+  }
+
+  stop() {
+    this.running = false;
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+  }
+
+  loop() {
+    const video = this.video;
+    let lastTime = -1;
+    const next = () => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(onFrame) : requestAnimationFrame(onFrame));
+    const onFrame = () => {
+      if (!this.running) return;
+      if (video.currentTime !== lastTime && video.videoWidth) {
+        lastTime = video.currentTime;
+        this.sample();
+      }
+      next();
+    };
+    next();
+  }
+
+  sample() {
+    const t = now();
+    this.gctx.drawImage(this.video, 0, 0, this.grab.width, this.grab.height);
+    const px = this.gctx.getImageData(0, 0, this.grab.width, this.grab.height).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
+    const count = px.length / 4;
+    r /= count; g /= count; b /= count;
+    // A lit fingertip fills the frame with a deep red.
+    this.onFrame?.(t, r, r > 40 && r > 1.8 * g && r > 1.8 * b);
+  }
+}
 
 if (typeof document !== 'undefined') {
   const WARMUP = 5;    // seconds discarded while the signal settles
@@ -133,18 +222,13 @@ if (typeof document !== 'undefined') {
 
   const hrv = {
     context: 'other', // 'morning' | 'other'
-    stream: null,
+    cam: new PulseCamera($('#hrvVideo')),
     running: false,
     samples: [],
     start: 0,
     lastCovered: 0,
     lastLive: 0,
   };
-
-  const grab = document.createElement('canvas');
-  grab.width = 40;
-  grab.height = 30;
-  const gctx = grab.getContext('2d', { willReadFrequently: true });
 
   window.openHrv = (context) => {
     hrv.context = context;
@@ -162,52 +246,34 @@ if (typeof document !== 'undefined') {
     c.getContext('2d').clearRect(0, 0, c.width, c.height);
   }
 
-  async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } },
-      audio: false,
-    });
-    const video = $('#hrvVideo');
-    video.srcObject = stream;
-    await video.play();
-    const track = stream.getVideoTracks()[0];
-    let torch = false;
-    try {
-      if (track.getCapabilities?.().torch) {
-        await track.applyConstraints({ advanced: [{ torch: true }] });
-        torch = true;
-      }
-    } catch { torch = false; }
-    return { stream, torch };
-  }
-
   function stopCamera() {
     hrv.running = false;
-    hrv.stream?.getTracks().forEach((t) => t.stop());
-    hrv.stream = null;
+    hrv.cam.stop();
   }
 
   $('#hrvStart').addEventListener('click', async () => {
     $('#hrvResult').innerHTML = '';
     $('#hrvStart').hidden = true;
     $('#hrvStatus').textContent = 'Accendo la fotocamera…';
-    let cam;
+    let torch;
+    hrv.samples = [];
+    hrv.start = now();
+    hrv.lastCovered = now();
+    hrv.cam.onFrame = sample;
     try {
-      cam = await startCamera();
+      torch = await hrv.cam.start();
     } catch {
       $('#hrvStatus').textContent = 'Non riesco ad accedere alla fotocamera. Controlla il permesso nelle impostazioni del browser.';
       $('#hrvStart').hidden = false;
       return;
     }
-    hrv.stream = cam.stream;
-    $('#hrvTorchHint').textContent = cam.torch
+    $('#hrvTorchHint').textContent = torch
       ? ''
       : 'Il browser non permette di accendere il flash: mettiti vicino a una luce forte, per esempio sotto una lampada.';
     hrv.samples = [];
     hrv.start = now();
     hrv.lastCovered = now();
     hrv.running = true;
-    loop();
   });
 
   $('#hrvBack').addEventListener('click', () => {
@@ -215,33 +281,8 @@ if (typeof document !== 'undefined') {
     show('home');
   });
 
-  function loop() {
+  function sample(t, r, covered) {
     if (!hrv.running) return;
-    const video = $('#hrvVideo');
-    const next = () => (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(onFrame) : requestAnimationFrame(onFrame));
-    let lastTime = -1;
-    function onFrame() {
-      if (!hrv.running) return;
-      if (video.currentTime !== lastTime && video.videoWidth) {
-        lastTime = video.currentTime;
-        sample(video);
-      }
-      next();
-    }
-    next();
-  }
-
-  function sample(video) {
-    const t = now();
-    gctx.drawImage(video, 0, 0, grab.width, grab.height);
-    const px = gctx.getImageData(0, 0, grab.width, grab.height).data;
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
-    const count = px.length / 4;
-    r /= count; g /= count; b /= count;
-
-    // A lit fingertip fills the frame with a deep red.
-    const covered = r > 40 && r > 1.8 * g && r > 1.8 * b;
     if (!covered) {
       if (t - hrv.lastCovered > 1.5) {
         hrv.samples = [];

@@ -51,6 +51,9 @@ function importBackup(json, skip = []) {
       if (!fresh.length && !changed) continue;
       added += fresh.length;
       store.set(key, current.concat(fresh).sort((a, b) => tsOf(a) - tsOf(b)));
+    } else if (name === 'resonance') {
+      const current = store.get(key, null);
+      if (!current || incoming.ts > current.ts) store.set(key, incoming);
     } else if (name === 'program') {
       const current = store.get(key, null);
       // Keep the earliest start and the furthest week already seen.
@@ -134,6 +137,9 @@ function renderReport() {
   if (hrvM.length >= 10) {
     row('HRV al risveglio: prime 5 misure → ultime 5', `${Math.round(avg(hrvM.slice(0, 5).map((m) => m.rmssd)))} → ${Math.round(avg(hrvM.slice(-5).map((m) => m.rmssd)))} ms`);
   }
+
+  const reso = store.get(KEYS.resonance, null);
+  if (reso) row('Frequenza respiratoria di risonanza (test con fotocamera)', `${String(reso.rate).replace('.', ',')} respiri/min, ${fmtDate(reso.ts)}`);
 
   const eps = store.get(KEYS.episodes, []);
   if (eps.length) {

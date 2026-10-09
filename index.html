@@ -37,6 +37,7 @@
         <button class="btn" data-go="checkin" data-flow="sos">SOS ansia · 90 secondi</button>
         <button class="btn" id="anchorOpen" hidden>Àncora a vibrazione · 1 minuto</button>
         <button class="btn" id="hrvOpen">Misura il battito</button>
+        <button class="btn" id="resOpen">Trova il tuo ritmo di respiro</button>
         <button class="btn ghost" data-go="diary">Diario</button>
       </div>
 
@@ -127,6 +128,7 @@
         <button class="btn small" id="voiceTest" type="button">Prova</button>
       </div>
       <label class="toggle"><input type="checkbox" id="sound" checked> Suono del fiume</label>
+      <p class="hint" id="rhythmHint"></p>
       <p class="hint" id="modeHint"></p>
       <div class="actions">
         <button class="btn primary" id="startBtn">Inizia</button>
@@ -283,6 +285,30 @@
       </div>
     </section>
 
+    <!-- RESONANCE: find the personal breathing rate with the camera pulse -->
+    <section class="screen" data-screen="resonance">
+      <h2>Il tuo ritmo di respiro</h2>
+      <div id="resIntro" class="res-block">
+        <p class="hint">A ogni respiro il battito accelera quando inspiri e rallenta quando espiri. C’è un ritmo, diverso per ognuno, in cui questa onda diventa più ampia: è lì che il nervo vago lavora meglio.</p>
+        <p class="hint">Proverai 5 ritmi, un minuto ciascuno (circa 6 minuti in tutto). In una posizione comoda, appoggia il polpastrello sulla fotocamera posteriore e respira con la pancia seguendo il cerchio: quando si allarga inspiri, quando si stringe espiri. Senza forzare.</p>
+        <div id="resCurrent"></div>
+        <div class="actions">
+          <button class="btn primary" id="resStart">Inizia il test</button>
+          <button class="btn ghost" data-go="home">Indietro</button>
+        </div>
+      </div>
+      <div id="resRun" class="res-block" hidden>
+        <p class="label" id="resStep"></p>
+        <div class="res-stage"><div class="res-dot" id="resDot"></div></div>
+        <p class="res-phase" id="resPhase"></p>
+        <p class="hint" id="resStatus"></p>
+        <div class="res-progress"><div id="resBar"></div></div>
+        <button class="btn ghost small" id="resStop">Interrompi</button>
+      </div>
+      <div id="resResult" class="res-block" hidden></div>
+      <video id="resVideo" playsinline muted hidden></video>
+    </section>
+
     <!-- REPORT: printable summary for a doctor -->
     <section class="screen report" data-screen="report">
       <div id="reportBody"></div>
@@ -303,6 +329,7 @@
   <script src="hrv.js"></script>
   <script src="anchor.js"></script>
   <script src="episodes.js"></script>
+  <script src="resonance.js"></script>
   <script src="reflect.js"></script>
   <script src="report.js"></script>
   <script src="sync.js"></script>

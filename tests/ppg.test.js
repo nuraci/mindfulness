@@ -54,4 +54,39 @@ const j = PPG.analyse(junk.samples);
 console.log(`noisy signal quality ${j.quality.toFixed(2)}`);
 assert(j.quality < 0.7, 'noisy signal rejected');
 
+// Resonance: heart rate swings with the breath, most strongly at 5.5
+// breaths/min in this synthetic person. The test must find that rate.
+function breathingPerson(rate, seconds = 70, seed = 7) {
+  const r = rng(seed);
+  const swing = Math.max(2, 12 - 9 * (rate - 5.5) ** 2); // bpm peak-to-trough
+  const cycle = 60 / rate;
+  const beats = [];
+  for (let t = 0; t < seconds + 2;) {
+    const hr = 64 + (swing / 2) * Math.sin((2 * Math.PI * t) / cycle - Math.PI / 2) + 0.5 * r.gauss();
+    t += 60 / hr;
+    beats.push(t);
+  }
+  const samples = [];
+  for (let t = 0; t < seconds; t += 1 / 30 + 0.004 * r.gauss()) {
+    let p = 0;
+    for (const b of beats) {
+      const d = t - b;
+      if (d > -0.1 && d < 0.8) p += Math.exp(-((d - 0.1) ** 2) / 0.004) + 0.4 * Math.exp(-((d - 0.35) ** 2) / 0.01);
+    }
+    samples.push({ t, v: 180 - 2.5 * p + 0.05 * r.gauss() });
+  }
+  return { samples, swing, cycle };
+}
+
+const found = [6.5, 6, 5.5, 5, 4.5].map((rate) => {
+  const { samples, swing, cycle } = breathingPerson(rate);
+  const a = PPG.analyse(samples);
+  const res = PPG.rsa(a, 0, cycle);
+  console.log(`rate ${rate}: swing ${swing.toFixed(1)} -> ${res.amp.toFixed(1)} bpm over ${res.cycles} cycles`);
+  assert(Math.abs(res.amp - swing) < Math.max(2.5, swing * 0.3), 'rsa amplitude');
+  return { rate, amp: res.amp };
+});
+const best = found.reduce((x, y) => (y.amp > x.amp ? y : x));
+assert.strictEqual(best.rate, 5.5, 'resonance rate');
+
 console.log('ok');
