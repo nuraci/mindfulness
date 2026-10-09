@@ -779,13 +779,17 @@ function renderProgramCard(st) {
       <button class="btn primary" id="progGo">${tonight ? 'Fatta stasera ✓ · Ripeti' : 'Sessione della sera'}</button>
       <div class="practice">
         <p><strong>Durante il giorno:</strong> ${w.daily}</p>
-        <button class="btn small" id="anchorBtn">Fatto${anchorsToday ? ` · ${anchorsToday}` : ''}</button>
+        <div class="practice-btns">
+          ${'vibrate' in navigator ? '<button class="btn small" id="anchorGuide">Guidami \u00b7 vibrazione</button>' : ''}
+          <button class="btn small" id="anchorBtn">Fatto${anchorsToday ? ` · ${anchorsToday}` : ''}</button>
+        </div>
       </div>
     </div>`;
   $('#progGo').addEventListener('click', () => {
     state.flow = 'program';
     show('checkin');
   });
+  $('#anchorGuide')?.addEventListener('click', () => openAnchor());
   $('#anchorBtn').addEventListener('click', () => {
     store.push(KEYS.anchors, Date.now());
     renderProgramCard(programStatus());

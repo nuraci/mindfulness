@@ -32,6 +32,12 @@ practice lead to better mornings?).
   reports heart rate and RMSSD, a standard marker of vagal activity, and
   tracks the morning trend over weeks. Can also be run any time from home,
   e.g. before and after a session (readings within 45 minutes are compared).
+- **Vibration anchor (Android).** The daytime practice can be guided by
+  vibration alone: a dense soft buzz for the inhale, taps that slow down for
+  the exhale, at the current week's rhythm, 3/6/10 breaths. The screen stays
+  on but black (browsers cannot vibrate with the screen off); finishing logs
+  the daytime practice. iOS browsers do not support vibration, so the button
+  only appears where `navigator.vibrate` exists.
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.
@@ -105,6 +111,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `index.html` | Screens: home, check-in, setup, session, check-out, summary, night, diary |
 | `program.js` | The six-week programme: per-week scripts, colours, pads, daytime practice |
 | `hrv.js` | Camera photoplethysmography: `PPG.analyse` (pure, tested) and the measurement screen |
+| `anchor.js` | Vibration-guided breathing for the daytime anchor |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |

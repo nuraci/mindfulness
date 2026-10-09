@@ -239,6 +239,41 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 
 .file-btn { text-align: center; }
 
+/* Anchor */
+.practice-btns { display: flex; flex-direction: column; gap: 6px; }
+.screen.anchor.running {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  margin: 0;
+  z-index: 5;
+  background: #000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  border-radius: 0;
+  justify-content: center;
+  align-items: center;
+}
+.anchor-setup { display: flex; flex-direction: column; gap: 14px; }
+.anchor-setup[hidden] { display: none; }
+.anchor-run { display: flex; flex-direction: column; align-items: center; gap: 40px; }
+.anchor-run[hidden] { display: none; }
+.anchor-dot {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(95, 211, 198, 0.25), rgba(95, 211, 198, 0) 70%);
+  transform: scale(0.45);
+  transition-property: transform;
+  transition-timing-function: ease-in-out;
+}
+#anchorPhase { color: #3a4a50; margin: 0; font-size: 0.9rem; }
+.anchor .btn.ghost.small { color: #3a4a50; border-color: #1a2226; }
+
 /* HRV */
 #hrvWave { width: 100%; height: 70px; }
 .hrv-live { display: flex; gap: 12px; align-items: baseline; min-height: 1.4em; font-size: 0.9rem; color: var(--muted); }

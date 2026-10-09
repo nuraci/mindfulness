@@ -31,6 +31,7 @@
       <div class="actions">
         <button class="btn" data-go="checkin" data-flow="flow">Sessione libera</button>
         <button class="btn" data-go="checkin" data-flow="sos">SOS · 90 secondi</button>
+        <button class="btn" id="anchorOpen" hidden>Àncora a vibrazione · 1 minuto</button>
         <button class="btn" id="hrvOpen">Misura il battito</button>
         <button class="btn ghost" data-go="diary">Diario</button>
       </div>
@@ -193,6 +194,31 @@
       </div>
     </section>
 
+    <!-- ANCHOR: one minute of breathing guided by vibration only -->
+    <section class="screen anchor" data-screen="anchor">
+      <div id="anchorSetup" class="anchor-setup">
+        <h2>Àncora a vibrazione</h2>
+        <p class="hint">Mano sulla pancia, telefono in mano o in tasca. Non serve guardarlo.</p>
+        <p class="hint"><strong>Vibrazione fitta e morbida:</strong> inspira con la pancia.<br><strong>Colpetti sempre più radi:</strong> espira piano, fino in fondo.</p>
+        <p class="hint">Lo schermo resta acceso ma nero: il browser non può vibrare a schermo spento.</p>
+        <p class="label">Durata</p>
+        <div class="seg" id="anchorCycles">
+          <button data-v="3">3 respiri</button>
+          <button data-v="6" class="on">6 respiri</button>
+          <button data-v="10">10 respiri</button>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="anchorStart">Inizia</button>
+          <button class="btn ghost" data-go="home">Indietro</button>
+        </div>
+      </div>
+      <div id="anchorRun" class="anchor-run" hidden>
+        <div class="anchor-dot" id="anchorDot"></div>
+        <p id="anchorPhase"></p>
+        <button class="btn ghost small" id="anchorStop">Termina</button>
+      </div>
+    </section>
+
     <!-- REPORT: printable summary for a doctor -->
     <section class="screen report" data-screen="report">
       <div id="reportBody"></div>
@@ -206,6 +232,7 @@
   <script src="program.js"></script>
   <script src="app.js"></script>
   <script src="hrv.js"></script>
+  <script src="anchor.js"></script>
   <script src="report.js"></script>
 </body>
 </html>
