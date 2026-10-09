@@ -18,6 +18,8 @@ const KEYS = {
   reminders: 'fluire.reminders.v1', // { evening: 'HH:MM', morning: 'HH:MM' }
   voice: 'fluire.voice.v1',         // name of the chosen system voice
   backup: 'fluire.backup.v1',       // ts of the last export
+  hrv: 'fluire.hrv.v1',             // [{ ts, rmssd, hr, n, quality, context: 'morning' | 'other' }]
+  hrvSkip: 'fluire.hrvskip.v1',     // dayKey of a morning when the HRV prompt was dismissed
 };
 
 const store = {
@@ -636,6 +638,7 @@ function renderHome() {
   renderMorningCard(st);
   renderProgramCard(st);
   renderResults($('#resultsCard'), true);
+  renderHrvCard($('#hrvCard'));
 }
 
 // Data lives only in this browser; nudge towards an export now and then.
@@ -656,7 +659,8 @@ function renderMorningCard(st) {
   const el = $('#morningCard');
   const today = dayKey(Date.now());
   const done = store.get(KEYS.mornings, []).some((m) => dayKey(m.ts) === today);
-  if (!st || !isMorning() || done) { el.innerHTML = ''; return; }
+  if (!st || !isMorning()) { el.innerHTML = ''; return; }
+  if (done) { renderHrvPrompt(el, today); return; }
   el.innerHTML = `
     <div class="card morning">
       <span class="kicker">Check-in del mattino</span>
@@ -697,6 +701,48 @@ function renderMorningCard(st) {
     store.push(KEYS.mornings, { ts: Date.now(), gut: +$('#mGut').value, sleep: +$('#mSleep').value, bristol, dinner: [...dinner] });
     renderHome();
   });
+}
+
+// After the morning check-in, offer the one-minute HRV reading once a day.
+function renderHrvPrompt(el, today) {
+  const measured = store.get(KEYS.hrv, []).some((m) => m.context === 'morning' && dayKey(m.ts) === today);
+  if (measured || store.get(KEYS.hrvSkip, null) === today) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="card morning">
+      <span class="kicker">Check-in salvato</span>
+      <p>Vuoi misurare anche il battito? Un minuto, con il dito sulla fotocamera: è il modo per vedere se il nervo vago si sta allenando.</p>
+      <button class="btn primary" id="hrvMorning">Misura (1 minuto)</button>
+      <button class="btn ghost small" id="hrvSkip">Non oggi</button>
+    </div>`;
+  $('#hrvMorning').addEventListener('click', () => openHrv('morning'));
+  $('#hrvSkip').addEventListener('click', () => { store.set(KEYS.hrvSkip, today); renderHome(); });
+}
+
+// Morning HRV over time. Higher RMSSD = more vagal activity, but only relative
+// to the same person, so the card compares recent readings with the first ones.
+function renderHrvCard(el) {
+  const list = store.get(KEYS.hrv, []).filter((m) => m.context === 'morning');
+  if (!list.length) { el.innerHTML = ''; return; }
+  const last = list[list.length - 1];
+  const recent = list.filter((m) => Date.now() - m.ts < 7 * 24 * HOUR);
+  let line = `Ultima misura: <strong>${last.rmssd} ms</strong>, battito ${last.hr} bpm.`;
+  if (list.length >= 10) {
+    const first = avg(list.slice(0, 5).map((m) => m.rmssd));
+    const now7 = avg(list.slice(-5).map((m) => m.rmssd));
+    line += ` Prime 5 mattine: media <strong>${Math.round(first)} ms</strong>, ultime 5: <strong>${Math.round(now7)} ms</strong>${now7 > first ? ' — il tono vagale sta salendo.' : '.'}`;
+  } else if (recent.length >= 3) {
+    line += ` Media degli ultimi 7 giorni: <strong>${Math.round(avg(recent.map((m) => m.rmssd)))} ms</strong>.`;
+  } else {
+    line += ` Dopo una decina di mattine vedrai la tendenza (${list.length}/10).`;
+  }
+  el.innerHTML = `
+    <div class="card">
+      <span class="kicker">Nervo vago · HRV al mattino</span>
+      <p>${line}</p>
+      <details class="info"><summary>Cosa significa</summary>
+        <p>L’HRV (variabilità della frequenza cardiaca, qui come RMSSD) misura quanto il cuore varia da un battito all’altro. È governata soprattutto dal nervo vago: valori più alti indicano più attività di “riposo e digestione”. Varia molto tra persone e da un giorno all’altro (sonno, alcol, malattia), quindi conta la tendenza nelle settimane, confrontata con te e non con gli altri.</p>
+      </details>
+    </div>`;
 }
 
 function renderProgramCard(st) {
@@ -1239,5 +1285,8 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-renderHome();
-requestAnimationFrame(frame);
+// Other scripts (hrv.js, report.js) load after this one; start once all are in.
+document.addEventListener('DOMContentLoaded', () => {
+  renderHome();
+  requestAnimationFrame(frame);
+});

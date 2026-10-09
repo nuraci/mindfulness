@@ -26,6 +26,12 @@ practice lead to better mornings?).
   stays fair.
 - **Results.** Morning gut scores over the last 28 days, each point marked by
   whether the evening before had practice, plus the average of the two groups.
+- **Morning HRV from the camera.** After the check-in the app offers a
+  one-minute heart reading: fingertip on the rear camera (flash turned on where
+  the browser allows it — Android Chrome; on iPhone a bright lamp instead). It
+  reports heart rate and RMSSD, a standard marker of vagal activity, and
+  tracks the morning trend over weeks. Can also be run any time from home,
+  e.g. before and after a session (readings within 45 minutes are compared).
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.
@@ -98,6 +104,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | --- | --- |
 | `index.html` | Screens: home, check-in, setup, session, check-out, summary, night, diary |
 | `program.js` | The six-week programme: per-week scripts, colours, pads, daytime practice |
+| `hrv.js` | Camera photoplethysmography: `PPG.analyse` (pure, tested) and the measurement screen |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
@@ -126,6 +133,24 @@ up on the next load; the cache is only used offline.
    orientation and is discarded.
 4. If the signal variance is tiny, the app hints that it can't feel the breath
    (usually chest breathing, or the phone isn't on the belly).
+
+## How the camera HRV works
+
+1. Each frame is downscaled to 40×30 and averaged; a frame counts only if it is
+   dominated by red (a lit fingertip). Losing the finger for > 1.5 s restarts.
+2. After a 5 s warm-up, 60 s of mean-red values are resampled to 30 Hz,
+   inverted (blood makes the image darker) and detrended.
+3. Beats are found as local maxima (±0.25 s), then refined to millisecond
+   precision by matching each one against the average beat shape (template
+   cross-correlation with parabolic interpolation) — a single frame is 33 ms,
+   too coarse for HRV on its own.
+4. Inter-beat intervals outside 330–1500 ms or > 20 % from their local median
+   are rejected. RMSSD uses only consecutive valid pairs. A reading is saved
+   only with ≥ 30 valid beats and ≥ 70 % of intervals valid.
+
+`node tests/ppg.test.js` checks the analysis against synthetic pulse waves
+with known heart rate and RMSSD. With noisy signals RMSSD is biased upwards,
+which is why the quality gate matters.
 
 ## Disclaimer
 

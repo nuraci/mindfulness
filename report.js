@@ -111,6 +111,14 @@ function renderReport() {
     row('Fastidio al mattino dopo una sera con pratica / senza', `${f1(avg(withP.map((m) => m.gut)))} (n=${withP.length}) / ${f1(avg(without.map((m) => m.gut)))} (n=${without.length})`);
   }
 
+  const hrvM = store.get(KEYS.hrv, []).filter((m) => m.context === 'morning');
+  if (hrvM.length) {
+    row('HRV al risveglio (RMSSD, fotocamera), media', `${Math.round(avg(hrvM.map((m) => m.rmssd)))} ms, FC ${Math.round(avg(hrvM.map((m) => m.hr)))} bpm (n=${hrvM.length})`);
+  }
+  if (hrvM.length >= 10) {
+    row('HRV al risveglio: prime 5 misure → ultime 5', `${Math.round(avg(hrvM.slice(0, 5).map((m) => m.rmssd)))} → ${Math.round(avg(hrvM.slice(-5).map((m) => m.rmssd)))} ms`);
+  }
+
   const bristol = mornings.filter((m) => m.bristol);
   const bristolTable = bristol.length
     ? `<h3>Scala di Bristol (${bristol.length} registrazioni)</h3>
