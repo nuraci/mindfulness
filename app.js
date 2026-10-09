@@ -10,16 +10,25 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, t) => a + (b - a) * t;
 const now = () => performance.now() / 1000;
 
-const STORE_KEY = 'fluire.sessions.v1';
+const KEYS = {
+  sessions: 'fluire.sessions.v1',   // [{ ts, flow, week?, mode, seconds, sync, stressBefore, gutBefore, stressAfter?, gutAfter?, tags }]
+  mornings: 'fluire.mornings.v1',   // [{ ts, gut, sleep }]
+  program: 'fluire.program.v1',     // { started, seenWeek }
+  anchors: 'fluire.anchors.v1',     // [ts] daytime practice done
+  reminders: 'fluire.reminders.v1', // { evening: 'HH:MM', morning: 'HH:MM' }
+};
 
 const store = {
-  load() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+  get(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
   },
-  add(entry) {
-    const list = store.load();
-    list.push(entry);
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch { /* storage unavailable */ }
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+  },
+  push(key, item) {
+    const list = store.get(key, []);
+    list.push(item);
+    store.set(key, list);
     return list;
   },
 };
@@ -42,6 +51,11 @@ const PATTERNS = {
     { label: 'Inspira dal naso', dur: 2, to: 0.75, cue: 'in' },
     { label: 'Ancora un sorso d’aria', dur: 1, to: 1, cue: 'in2' },
     { label: 'Espira tutto, piano', dur: 6, to: 0, cue: 'out' },
+  ],
+  // Slower variant for the later weeks, once the 4/6 rhythm feels easy.
+  deep: [
+    { label: 'Inspira con la pancia', dur: 5, to: 1, cue: 'in' },
+    { label: 'Espira lentamente', dur: 7, to: 0, cue: 'out' },
   ],
   idle: [
     { label: '', dur: 5, to: 1 },
@@ -175,7 +189,7 @@ class BreathSensor {
 // ---------------------------------------------------------------------------
 
 class Soundscape {
-  start() {
+  start(pad = [110, 164.81, 220, 277.18]) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = (this.ctx = new AC());
@@ -209,7 +223,7 @@ class Soundscape {
     this.padGain = ctx.createGain();
     this.padGain.gain.value = 0;
     this.padGain.connect(this.master);
-    for (const f of [110, 164.81, 220, 277.18]) {
+    for (const f of pad) {
       const o = ctx.createOscillator();
       o.type = 'sine';
       o.frequency.value = f;
@@ -246,13 +260,15 @@ class Soundscape {
     o.stop(t + 2.6);
   }
 
-  stop() {
+  // `fade` is the time constant in seconds: long in the evening, so the sound
+  // dissolves instead of stopping.
+  stop(fade = 0.3) {
     if (!this.ctx) return;
     const ctx = this.ctx;
     this.ctx = null;
     this.master.gain.cancelScheduledValues(ctx.currentTime);
-    this.master.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
-    setTimeout(() => ctx.close(), 1500);
+    this.master.gain.setTargetAtTime(0, ctx.currentTime, fade);
+    setTimeout(() => ctx.close(), fade * 5000 + 200);
   }
 }
 
@@ -291,7 +307,7 @@ class Guide {
   }
   plan(lines, duration, endLine) {
     this.queue = lines.filter(([at]) => at <= duration - 40).map(([at, text]) => ({ at, text }));
-    if (endLine) this.queue.push({ at: Math.max(0, duration - 22), text: endLine });
+    if (endLine) this.queue.push({ at: Math.max(0, duration - 35), text: endLine });
   }
   say(text) {
     if (!this.enabled) return;
@@ -319,6 +335,7 @@ class River {
     this.ctx = canvas.getContext('2d');
     this.particles = Array.from({ length: 260 }, () => this.spawn(Math.random()));
     this.time = 0;
+    this.tint = [110, 220, 205];
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -363,9 +380,9 @@ class River {
 
     const turb = 1 - calm;
     const width = Math.min(h * 0.11, 90) * (0.75 + 0.5 * level);
-    const cr = Math.round(lerp(150, 110, calm));
-    const cg = Math.round(lerp(110, 220, calm));
-    const cb = Math.round(lerp(70, 205, calm));
+    const cr = Math.round(lerp(150, this.tint[0], calm));
+    const cg = Math.round(lerp(110, this.tint[1], calm));
+    const cb = Math.round(lerp(70, this.tint[2], calm));
     const flow = (0.035 + 0.02 * calm) * dt;
 
     for (const p of this.particles) {
@@ -390,17 +407,61 @@ class River {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Days, programme progress, mornings
+// ---------------------------------------------------------------------------
+
+const HOUR = 3600 * 1000;
+const avg = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
+
+function dayKey(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+// An evening session that runs past midnight still belongs to that evening.
+const eveningKey = (ts) => dayKey(ts - 5 * HOUR);
+
+const isMorning = () => { const h = new Date().getHours(); return h >= 4 && h < 13; };
+
+function programStatus() {
+  const prog = store.get(KEYS.program, null);
+  if (!prog) return null;
+  const sessions = store.get(KEYS.sessions, []);
+  for (let w = 1; w <= PROGRAM.length; w++) {
+    const days = new Set(sessions.filter((e) => e.week === w).map((e) => eveningKey(e.ts))).size;
+    if (days < DAYS_PER_WEEK) return { prog, week: w, days, done: false };
+  }
+  return { prog, week: PROGRAM.length, days: DAYS_PER_WEEK, done: true };
+}
+
+function doneTonight() {
+  const today = eveningKey(Date.now());
+  return store.get(KEYS.sessions, []).some((e) => e.flow === 'program' && eveningKey(e.ts) === today);
+}
+
+// A morning counts as "after practice" if a session happened in the 16 hours before it.
+function annotateMornings() {
+  const sessions = store.get(KEYS.sessions, []);
+  return store.get(KEYS.mornings, []).map((m) => ({
+    ...m,
+    practiced: sessions.some((e) => e.ts <= m.ts && m.ts - e.ts <= 16 * HOUR),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // App state & screens
 // ---------------------------------------------------------------------------
 
+const DEFAULT_TINT = [110, 220, 205];
+
 const state = {
-  flow: 'flow',
+  flow: 'flow', // 'program' | 'flow' | 'sos'
   tags: new Set(),
-  duration: 300,
+  duration: 600,
   mode: 'belly',
   session: null,
-  lastEntry: null,
+  pending: null,
 };
 
 const river = new River($('#river'));
@@ -414,22 +475,23 @@ function show(name) {
   window.scrollTo(0, 0);
 }
 
-$$('[data-go]').forEach((b) =>
-  b.addEventListener('click', () => {
-    if (b.dataset.flow) state.flow = b.dataset.flow;
-    show(b.dataset.go);
-  })
-);
+function bindGo(root) {
+  root.querySelectorAll('[data-go]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.dataset.flow) state.flow = b.dataset.flow;
+      show(b.dataset.go);
+    })
+  );
+}
+bindGo(document);
 
-function bindSlider(id) {
-  const input = $('#' + id);
-  const out = $('#' + id + 'Out');
+function bindSlider(input) {
+  const out = $('#' + input.id + 'Out');
   const sync = () => (out.textContent = input.value);
   input.addEventListener('input', sync);
   sync();
-  return input;
 }
-['stressBefore', 'gutBefore', 'stressAfter', 'gutAfter'].forEach(bindSlider);
+['stressBefore', 'gutBefore', 'stressAfter', 'gutAfter'].forEach((id) => bindSlider($('#' + id)));
 
 function setSlider(id, v) {
   $('#' + id).value = v;
@@ -464,7 +526,10 @@ bindSeg('mode', 'mode');
 
 function renderSetup() {
   const sos = state.flow === 'sos';
-  $('#setupTitle').textContent = sos ? 'SOS · sospiro fisiologico' : 'Prepara la sessione';
+  const st = state.flow === 'program' ? programStatus() : null;
+  $('#setupTitle').textContent = sos
+    ? 'SOS · sospiro fisiologico'
+    : st ? `Settimana ${st.week} · ${PROGRAM[st.week - 1].title}` : 'Sessione libera';
   $('#durationGroup').style.display = sos ? 'none' : '';
   $('#modeHint').textContent =
     state.mode === 'belly'
@@ -473,25 +538,253 @@ function renderSetup() {
 }
 
 // ---------------------------------------------------------------------------
+// Home
+// ---------------------------------------------------------------------------
+
+function renderHome() {
+  const st = programStatus();
+  river.tint = st ? PROGRAM[st.week - 1].tint : DEFAULT_TINT;
+  renderMorningCard(st);
+  renderProgramCard(st);
+  renderResults($('#resultsCard'), true);
+}
+
+function renderMorningCard(st) {
+  const el = $('#morningCard');
+  const today = dayKey(Date.now());
+  const done = store.get(KEYS.mornings, []).some((m) => dayKey(m.ts) === today);
+  if (!st || !isMorning() || done) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="card morning">
+      <span class="kicker">Check-in del mattino</span>
+      <h3>Buongiorno. Com'è la pancia stamattina?</h3>
+      <label class="slider">
+        <span>Pancia <output id="mGutOut">3</output></span>
+        <input type="range" id="mGut" min="0" max="10" value="3">
+        <span class="scale"><i>tranquilla</i><i>molto fastidio</i></span>
+      </label>
+      <label class="slider">
+        <span>Sonno <output id="mSleepOut">6</output></span>
+        <input type="range" id="mSleep" min="0" max="10" value="6">
+        <span class="scale"><i>pessimo</i><i>ottimo</i></span>
+      </label>
+      <button class="btn primary" id="mSave">Salva</button>
+    </div>`;
+  bindSlider($('#mGut'));
+  bindSlider($('#mSleep'));
+  $('#mSave').addEventListener('click', () => {
+    store.push(KEYS.mornings, { ts: Date.now(), gut: +$('#mGut').value, sleep: +$('#mSleep').value });
+    renderHome();
+  });
+}
+
+function renderProgramCard(st) {
+  const el = $('#programCard');
+  if (!st) {
+    el.innerHTML = `
+      <div class="card">
+        <span class="kicker">Percorso serale · 6 settimane</span>
+        <h3>Dal respiro al mare</h3>
+        <p>Ogni settimana una nuova immagine guidata, che si somma alle precedenti: respiro, calore, fiume, manopola, rive, mare. Si pratica la sera a letto; il mattino dopo un check-in da 10 secondi ti mostra se funziona.</p>
+        <button class="btn primary" id="progStart">Inizia il percorso</button>
+      </div>`;
+    $('#progStart').addEventListener('click', () => {
+      store.set(KEYS.program, { started: Date.now(), seenWeek: 0 });
+      $('#reminders').open = true;
+      renderHome();
+    });
+    return;
+  }
+
+  const w = PROGRAM[st.week - 1];
+  const isNew = st.prog.seenWeek < st.week;
+  const tonight = doneTonight();
+  const anchorsToday = store.get(KEYS.anchors, []).filter((t) => dayKey(t) === dayKey(Date.now())).length;
+  const dots = Array.from({ length: DAYS_PER_WEEK }, (_, i) => `<i class="${i < st.days ? 'on' : ''}"></i>`).join('');
+  el.innerHTML = `
+    <div class="card">
+      <span class="kicker">${st.done ? 'Percorso completato' : `Settimana ${st.week} di ${PROGRAM.length}`}</span>
+      <h3>${w.title}${isNew ? '<span class="badge">nuova</span>' : ''}</h3>
+      ${isNew ? `<p>${w.intro}</p>` : `<details class="info"><summary>Di cosa parla</summary><p>${w.intro}</p></details>`}
+      ${st.done
+        ? '<p>Hai completato le 6 settimane. Continua con le sessioni che preferisci: il mare resta qui.</p>'
+        : `<div class="dots">${dots}<span>${st.days} di ${DAYS_PER_WEEK} sere per la prossima tappa</span></div>`}
+      <button class="btn primary" id="progGo">${tonight ? 'Fatta stasera ✓ · Ripeti' : 'Sessione della sera'}</button>
+      <div class="practice">
+        <p><strong>Durante il giorno:</strong> ${w.daily}</p>
+        <button class="btn small" id="anchorBtn">Fatto${anchorsToday ? ` · ${anchorsToday}` : ''}</button>
+      </div>
+    </div>`;
+  $('#progGo').addEventListener('click', () => {
+    state.flow = 'program';
+    show('checkin');
+  });
+  $('#anchorBtn').addEventListener('click', () => {
+    store.push(KEYS.anchors, Date.now());
+    renderProgramCard(programStatus());
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Results: morning gut score, split by whether the evening before had practice
+// ---------------------------------------------------------------------------
+
+function renderResults(el, compact) {
+  const mornings = annotateMornings();
+  if (!mornings.length) { el.innerHTML = ''; return; }
+
+  const withP = mornings.filter((m) => m.practiced);
+  const without = mornings.filter((m) => !m.practiced);
+  let insight;
+  if (withP.length >= 3 && without.length >= 3) {
+    const a = avg(withP.map((m) => m.gut)), b = avg(without.map((m) => m.gut));
+    insight = a < b
+      ? `Dopo una sera di pratica la pancia al mattino è in media <strong>${a.toFixed(1)}</strong>, contro <strong>${b.toFixed(1)}</strong> delle altre mattine.`
+      : `Per ora le mattine dopo la pratica (${a.toFixed(1)}) non sono migliori delle altre (${b.toFixed(1)}). Spesso l’effetto arriva dopo qualche settimana: continua a misurare.`;
+  } else if (mornings.length >= 10) {
+    const first = avg(mornings.slice(0, 5).map((m) => m.gut));
+    const last = avg(mornings.slice(-5).map((m) => m.gut));
+    insight = `Primi 5 check-in: media <strong>${first.toFixed(1)}</strong>. Ultimi 5: <strong>${last.toFixed(1)}</strong>.`;
+  } else {
+    insight = `Ogni check-in del mattino rende il quadro più chiaro. Dopo qualche giorno qui vedrai il confronto tra le mattine con e senza pratica (${mornings.length}/6).`;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <span class="kicker">Pancia al mattino · ultimi 28 giorni</span>
+      ${trendSvg(mornings)}
+      <p class="readout" id="${compact ? 'h' : 'd'}Readout">Tocca un punto per i dettagli.</p>
+      <div class="legend"><span><i class="fill"></i>sessione la sera prima</span><span><i class="ring"></i>nessuna sessione</span></div>
+      <p class="insight">${insight}</p>
+    </div>`;
+  const readout = el.querySelector('.readout');
+  el.querySelectorAll('.hit').forEach((h) => {
+    const showIt = () => (readout.textContent = h.dataset.label);
+    h.addEventListener('click', showIt);
+    h.addEventListener('mouseenter', showIt);
+  });
+}
+
+// One series (morning gut 0-10) over a 28-day window; filled dot = practised the
+// evening before, hollow = not. Higher is worse, so the axis says so.
+function trendSvg(mornings) {
+  const W = 300, H = 120, L = 22, R = 6, T = 8, B = 18;
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const DAY = 24 * HOUR;
+  const start = today.getTime() - 27 * DAY;
+  const x = (ts) => L + ((ts - start) / (27 * DAY)) * (W - L - R);
+  const y = (v) => T + (1 - v / 10) * (H - T - B);
+
+  // One point per day: the first check-in of that day.
+  const byDay = new Map();
+  for (const m of mornings) {
+    const d = new Date(m.ts);
+    d.setHours(12, 0, 0, 0);
+    if (d.getTime() >= start && !byDay.has(d.getTime())) byDay.set(d.getTime(), m);
+  }
+  const pts = [...byDay.entries()].sort((a, b) => a[0] - b[0]);
+
+  const grid = [0, 5, 10]
+    .map((v) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 5}" y="${y(v) + 3}" text-anchor="end">${v}</text>`)
+    .join('');
+  const fmt = (ts) => new Date(ts).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  const xlabels = `<text class="axis" x="${L}" y="${H - 4}">${fmt(start)}</text><text class="axis" x="${W - R}" y="${H - 4}" text-anchor="end">oggi</text>`;
+  const line = pts.length > 1 ? `<path class="line" d="${pts.map(([t, m], i) => `${i ? 'L' : 'M'}${x(t).toFixed(1)},${y(m.gut).toFixed(1)}`).join('')}"/>` : '';
+  const dots = pts
+    .map(([t, m]) => {
+      const label = `${new Date(m.ts).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })} · pancia ${m.gut} · sonno ${m.sleep} · ${m.practiced ? 'sessione la sera prima' : 'nessuna sessione'}`;
+      return `<circle class="dot ${m.practiced ? 'with' : 'without'}" cx="${x(t).toFixed(1)}" cy="${y(m.gut).toFixed(1)}" r="4"/>
+        <circle class="hit" cx="${x(t).toFixed(1)}" cy="${y(m.gut).toFixed(1)}" r="11" data-label="${label}"/>`;
+    })
+    .join('');
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Fastidio alla pancia al mattino, da 0 a 10, negli ultimi 28 giorni">
+    <text class="axis" x="${L}" y="${T - 1}">fastidio</text>${grid}${xlabels}${line}${dots}</svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// Reminders: an .ics file with two daily events for the length of the programme.
+// Works with any phone calendar and needs no server.
+// ---------------------------------------------------------------------------
+
+const rem = store.get(KEYS.reminders, null);
+if (rem) { $('#remEvening').value = rem.evening; $('#remMorning').value = rem.morning; }
+
+$('#remBtn').addEventListener('click', () => {
+  const evening = $('#remEvening').value || '22:30';
+  const morning = $('#remMorning').value || '07:30';
+  store.set(KEYS.reminders, { evening, morning });
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const local = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  const next = (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    if (d < new Date()) d.setDate(d.getDate() + 1);
+    return d;
+  };
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const url = location.origin + location.pathname;
+  const event = (id, when, minutes, summary, text) => [
+    'BEGIN:VEVENT',
+    `UID:fluire-${id}-${Date.now()}@fluire`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${local(next(when))}`,
+    `DURATION:PT${minutes}M`,
+    'RRULE:FREQ=DAILY;COUNT=42',
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${text}\\n${url}`,
+    `URL:${url}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${summary}`,
+    'TRIGGER:PT0M',
+    'END:VALARM',
+    'END:VEVENT',
+  ];
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Fluire//IT',
+    'CALSCALE:GREGORIAN',
+    ...event('evening', evening, 15, 'Fluire · sessione della sera', 'A letto, telefono sulla pancia.'),
+    ...event('morning', morning, 1, 'Fluire · check-in del mattino', '10 secondi: com’è la pancia stamattina?'),
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  a.download = 'fluire-promemoria.ics';
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+
+// ---------------------------------------------------------------------------
 // Session
 // ---------------------------------------------------------------------------
 
 const CHIMES = { in: 523.25, in2: 659.25, out: 392 };
+const FREE_BREATH = 90; // seconds at the end of long evening sessions with no cues
 
 $('#startBtn').addEventListener('click', async () => {
-  // Audio and speech must be unlocked synchronously inside the tap.
-  const sound = new Soundscape();
-  if ($('#sound').checked) sound.start();
-  const guide = new Guide($('#voice').checked);
-
   const sos = state.flow === 'sos';
+  const st = state.flow === 'program' ? programStatus() : null;
+  const week = st ? PROGRAM[st.week - 1] : null;
   const belly = state.mode === 'belly';
   const duration = sos ? 90 : state.duration;
   const settle = belly ? 10 : 3;
 
+  // Audio and speech must be unlocked synchronously inside the tap.
+  const sound = new Soundscape();
+  if ($('#sound').checked) sound.start(week?.pad);
+  const guide = new Guide($('#voice').checked);
+
   if (belly && !sos) guide.say(SCRIPTS.flowSettle);
   else if (belly) guide.say('Appoggia il telefono sulla pancia e chiudi gli occhi.');
-  guide.plan(sos ? SCRIPTS.sos : SCRIPTS.flow, duration, sos ? SCRIPTS.sosEnd : SCRIPTS.flowEnd);
+  if (week) guide.plan(week.script.concat(WIND_DOWN), duration, PROGRAM_END);
+  else guide.plan(sos ? SCRIPTS.sos : SCRIPTS.flow, duration, sos ? SCRIPTS.sosEnd : SCRIPTS.flowEnd);
 
   let sensor = null;
   if (belly) {
@@ -501,9 +794,13 @@ $('#startBtn').addEventListener('click', async () => {
     else sensor = null;
   }
 
+  if (st && st.prog.seenWeek < st.week) store.set(KEYS.program, { ...st.prog, seenWeek: st.week });
+  if (week) river.tint = week.tint;
+
   const t0 = now();
   state.session = {
-    pacer: new Pacer(sos ? PATTERNS.sos : PATTERNS.flow),
+    pacer: new Pacer(PATTERNS[sos ? 'sos' : week ? week.pattern : 'flow']),
+    week: st ? st.week : null,
     mode: sensor ? 'belly' : 'guide',
     duration,
     t0,
@@ -516,10 +813,10 @@ $('#startBtn').addEventListener('click', async () => {
     syncN: 0,
     lastPhase: -1,
     lastTrace: 0,
-    hint: belly && !sensor ? 'Sensori non disponibili: continuo in modalità guida.' : '',
+    freeBreath: false,
   };
   requestWakeLock();
-  $('#sensorHint').textContent = state.session.hint;
+  $('#sensorHint').textContent = belly && !sensor ? 'Sensori non disponibili: continuo in modalità guida.' : '';
   $('#tracePacer').setAttribute('d', '');
   $('#traceBreath').setAttribute('d', '');
   show('session');
@@ -537,21 +834,61 @@ function endSession() {
   if (!s) return;
   state.session = null;
   s.sensor?.stop();
-  s.sound.stop();
   s.guide.stop();
   wakeLock?.release().catch(() => {});
   wakeLock = null;
 
-  const elapsed = Math.max(0, Math.round(now() - s.startAt));
-  state.pending = {
+  const seconds = Math.max(0, Math.round(now() - s.startAt));
+  const base = {
+    ts: Date.now(),
     flow: state.flow,
     mode: s.mode,
-    seconds: elapsed,
+    seconds,
     sync: s.syncN ? Math.round((s.syncSum / s.syncN) * 100) : null,
+    stressBefore: +$('#stressBefore').value,
+    gutBefore: +$('#gutBefore').value,
+    tags: [...state.tags],
   };
-  setSlider('stressAfter', $('#stressBefore').value);
-  setSlider('gutAfter', $('#gutBefore').value);
+  clearTags();
+
+  if (s.week) {
+    // Evening: no questions afterwards, just let the sound dissolve.
+    s.sound.stop(3);
+    endEvening(s, base);
+    return;
+  }
+  s.sound.stop();
+  state.pending = base;
+  setSlider('stressAfter', base.stressBefore);
+  setSlider('gutAfter', base.gutBefore);
   show('checkout');
+}
+
+function endEvening(s, entry) {
+  const counted = entry.seconds >= 120;
+  const before = programStatus();
+  if (counted) store.push(KEYS.sessions, { ...entry, week: s.week });
+  const after = programStatus();
+
+  let progress;
+  if (!counted) progress = 'Sessione molto breve: stasera non la conto nel percorso. Va bene così.';
+  else if (!before.done && (after.week > before.week || after.done)) {
+    progress = after.done
+      ? 'Hai completato tutte e 6 le settimane del percorso.'
+      : `Settimana ${before.week} completata. Domani sera si sblocca <strong>${PROGRAM[after.week - 1].title}</strong>.`;
+  } else if (!after.done) progress = `Settimana ${after.week}: ${after.days} di ${DAYS_PER_WEEK} sere.`;
+  else progress = 'Sessione salvata.';
+
+  $('#nightBody').innerHTML = `
+    <p class="hint">${progress}</p>
+    ${entry.sync != null ? `<p class="hint">Sintonia media con la guida: ${entry.sync}%</p>` : ''}
+    <p class="hint">Domattina: un check-in da 10 secondi su com’è la pancia.</p>`;
+  show('night');
+}
+
+function clearTags() {
+  state.tags.clear();
+  $$('.chip').forEach((c) => c.classList.remove('on'));
 }
 
 function updateSession(s, t, dt) {
@@ -560,21 +897,27 @@ function updateSession(s, t, dt) {
   const elapsed = Math.max(0, t - s.startAt);
   const remaining = s.duration - elapsed;
 
+  // Long evening sessions end with a stretch of unguided breathing.
+  if (s.week && s.duration >= 600 && remaining < FREE_BREATH && !s.freeBreath) {
+    s.freeBreath = true;
+    $('#phase').textContent = 'Respiro libero';
+  }
+
   if (p.index !== s.lastPhase) {
     s.lastPhase = p.index;
-    s.sound.chime(CHIMES[p.phase.cue] || 440);
-    $('#phase').textContent = p.phase.label;
+    if (!s.freeBreath) {
+      s.sound.chime(CHIMES[p.phase.cue] || 440);
+      $('#phase').textContent = p.phase.label;
+    }
   }
   if (!settling) s.guide.tick(elapsed);
 
   let target;
-  if (s.mode === 'belly') {
+  if (s.mode === 'belly' && t - s.t0 > 3 && s.sensor.events === 0) {
     // Desktop browsers expose the API but never fire events.
-    if (t - s.t0 > 3 && s.sensor.events === 0) {
-      s.sensor.stop();
-      s.mode = 'guide';
-      $('#sensorHint').textContent = 'Nessun sensore di movimento: continuo in modalità guida.';
-    }
+    s.sensor.stop();
+    s.mode = 'guide';
+    $('#sensorHint').textContent = 'Nessun sensore di movimento: continuo in modalità guida.';
   }
   if (s.mode === 'belly') {
     const a = s.sensor.analyse(s.pacer, s.t0);
@@ -582,23 +925,25 @@ function updateSession(s, t, dt) {
       target = 0.1;
     } else {
       target = 0.1 + 0.9 * a.sync;
-      $('#sensorHint').textContent = a.still ? 'Non sento il respiro: lascia che sia la pancia a muoversi.' : '';
-      if (!settling) { s.syncSum += a.sync; s.syncN++; }
+      $('#sensorHint').textContent = a.still && !s.freeBreath ? 'Non sento il respiro: lascia che sia la pancia a muoversi.' : '';
+      if (!settling && !s.freeBreath) { s.syncSum += a.sync; s.syncN++; }
       if (t - s.lastTrace > 0.1) { s.lastTrace = t; drawTrace(s, a.trace, t); }
     }
   } else {
     target = settling ? 0.15 : 0.15 + 0.8 * clamp(elapsed / (s.duration * 0.7), 0, 1);
     if (t - s.lastTrace > 0.1) { s.lastTrace = t; drawTrace(s, null, t); }
   }
+  if (s.freeBreath) target = Math.max(target, s.calm); // never punish free breathing
   s.calm += (target - s.calm) * (1 - Math.exp(-dt / 3));
 
   $('#calmBar').style.width = `${Math.round(s.calm * 100)}%`;
   const r = Math.max(0, Math.ceil(remaining));
   $('#timeLeft').textContent = settling ? 'pronti…' : `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`;
-  s.sound.update(p.level, s.calm);
+  const level = s.freeBreath ? 0.35 : p.level;
+  s.sound.update(level, s.calm);
 
   if (remaining <= 0) endSession();
-  return { level: p.level, calm: s.calm };
+  return { level, calm: s.calm };
 }
 
 // Last 20 s: the guide as a dashed line, the measured breath as a solid one.
@@ -606,10 +951,12 @@ function drawTrace(s, trace, t) {
   const W = 300, H = 60, span = 20;
   const xOf = (tt) => W - ((t - tt) / span) * W;
   let d = '';
-  for (let i = 0; i <= 100; i++) {
-    const tt = t - span + (span * i) / 100;
-    const y = H - 6 - s.pacer.at(tt - s.t0).level * (H - 12);
-    d += `${i ? 'L' : 'M'}${xOf(tt).toFixed(1)},${y.toFixed(1)}`;
+  if (!s.freeBreath) {
+    for (let i = 0; i <= 100; i++) {
+      const tt = t - span + (span * i) / 100;
+      const y = H - 6 - s.pacer.at(tt - s.t0).level * (H - 12);
+      d += `${i ? 'L' : 'M'}${xOf(tt).toFixed(1)},${y.toFixed(1)}`;
+    }
   }
   $('#tracePacer').setAttribute('d', d);
   if (!trace || !trace.length) { $('#traceBreath').setAttribute('d', ''); return; }
@@ -620,31 +967,18 @@ function drawTrace(s, trace, t) {
 }
 
 // ---------------------------------------------------------------------------
-// Check-out, summary, diary
+// Check-out (free and SOS sessions), summary, diary
 // ---------------------------------------------------------------------------
 
 $('#saveBtn').addEventListener('click', () => {
-  const entry = {
-    ts: Date.now(),
-    ...state.pending,
-    stressBefore: +$('#stressBefore').value,
-    gutBefore: +$('#gutBefore').value,
-    stressAfter: +$('#stressAfter').value,
-    gutAfter: +$('#gutAfter').value,
-    tags: [...state.tags],
-  };
-  store.add(entry);
-  state.lastEntry = entry;
-  state.tags.clear();
-  $$('.chip').forEach((c) => c.classList.remove('on'));
+  const entry = { ...state.pending, stressAfter: +$('#stressAfter').value, gutAfter: +$('#gutAfter').value };
+  store.push(KEYS.sessions, entry);
   renderSummary(entry);
   show('summary');
 });
 
 function fmtDelta(before, after) {
-  const d = after - before;
-  const cls = d < 0 ? 'good' : '';
-  return `<b class="${cls}">${before} → ${after}</b>`;
+  return `<b class="${after < before ? 'good' : ''}">${before} → ${after}</b>`;
 }
 
 function renderSummary(e) {
@@ -664,58 +998,19 @@ function renderSummary(e) {
     <p class="insight">${msg}</p>`;
 }
 
-function dayKey(ts) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function streak(list) {
-  const days = new Set(list.map((e) => dayKey(e.ts)));
-  let n = 0;
-  const d = new Date();
-  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1); // today not done yet: count up to yesterday
-  while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
-  return n;
-}
-
-const avg = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
-
-function renderHome() {
-  const list = store.load();
-  if (!list.length) { $('#homeStats').innerHTML = ''; return; }
-  const drop = avg(list.map((e) => e.stressBefore - e.stressAfter));
-  $('#homeStats').innerHTML = `
-    <div class="stat"><b>${list.length}</b><span>sessioni</span></div>
-    <div class="stat"><b>${streak(list)}</b><span>giorni di fila</span></div>
-    <div class="stat"><b>${drop > 0 ? '−' : ''}${Math.abs(drop).toFixed(1)}</b><span>stress medio</span></div>`;
-}
-
 function renderDiary() {
-  const list = store.load();
-  if (!list.length) {
-    $('#diaryBody').innerHTML = '<p class="hint">Ancora nessuna sessione. Dopo la prima troverai qui come cambiano stress e pancia nel tempo.</p>';
+  const sessions = store.get(KEYS.sessions, []);
+  const mornings = annotateMornings();
+  if (!sessions.length && !mornings.length) {
+    $('#diaryBody').innerHTML = '<p class="hint">Ancora niente qui. Dopo la prima sessione e il primo check-in del mattino troverai come cambia la pancia nel tempo.</p>';
     return;
   }
-  const recent = list.slice(-14);
-  const W = 300, H = 120, bw = W / 14;
-  const bars = recent
-    .map((e, i) => {
-      const x = i * bw;
-      const hb = (e.gutBefore / 10) * H, ha = (e.gutAfter / 10) * H;
-      return `<rect class="before" x="${x + bw * 0.1}" y="${H - hb}" width="${bw * 0.38}" height="${hb}" rx="2"/>
-              <rect class="after" x="${x + bw * 0.52}" y="${H - ha}" width="${bw * 0.38}" height="${ha}" rx="2"/>`;
-    })
-    .join('');
 
   const insights = [];
-  const gutDrop = avg(list.map((e) => e.gutBefore - e.gutAfter));
-  const stressDrop = avg(list.map((e) => e.stressBefore - e.stressAfter));
-  insights.push(`In media una sessione abbassa lo stress di <strong>${stressDrop.toFixed(1)}</strong> e il fastidio alla pancia di <strong>${gutDrop.toFixed(1)}</strong> punti.`);
-
-  // Which tags go with a worse gut at check-in?
-  const base = avg(list.map((e) => e.gutBefore));
+  // Which tags at the evening check-in go with a worse gut?
+  const base = avg(sessions.map((e) => e.gutBefore));
   const tagStats = TAGS.map((t) => {
-    const withTag = list.filter((e) => e.tags?.includes(t));
+    const withTag = sessions.filter((e) => e.tags?.includes(t));
     return { t, n: withTag.length, gut: avg(withTag.map((e) => e.gutBefore)) };
   })
     .filter((x) => x.n >= 3 && x.gut - base >= 1)
@@ -724,30 +1019,38 @@ function renderDiary() {
     const top = tagStats[0];
     insights.push(`Quando segni <strong>${top.t}</strong> la pancia parte da ${top.gut.toFixed(1)} invece di ${base.toFixed(1)}. Vale la pena osservarlo.`);
   }
-
-  const syncs = list.filter((e) => e.sync != null).slice(-5);
+  const sleepWith = mornings.filter((m) => m.practiced), sleepWithout = mornings.filter((m) => !m.practiced);
+  if (sleepWith.length >= 3 && sleepWithout.length >= 3) {
+    insights.push(`Sonno medio dopo una sera di pratica: <strong>${avg(sleepWith.map((m) => m.sleep)).toFixed(1)}</strong>, altre notti: <strong>${avg(sleepWithout.map((m) => m.sleep)).toFixed(1)}</strong>.`);
+  }
+  const syncs = sessions.filter((e) => e.sync != null).slice(-5);
   if (syncs.length >= 2) {
     insights.push(`Sintonia nelle ultime sessioni con il telefono sulla pancia: ${syncs.map((e) => e.sync + '%').join(' · ')}.`);
   }
 
-  const items = list
-    .slice(-20)
-    .reverse()
-    .map((e) => {
-      const d = new Date(e.ts);
-      const when = d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-      const kind = e.flow === 'sos' ? 'SOS' : e.seconds < 60 ? '<1 min' : `${Math.round(e.seconds / 60)} min`;
-      return `<li>Stress ${e.stressBefore}→${e.stressAfter} · Pancia ${e.gutBefore}→${e.gutAfter}
-        <div class="meta">${when} · ${kind}${e.tags?.length ? ' · ' + e.tags.join(', ') : ''}</div></li>`;
-    })
-    .join('');
+  const when = (ts) => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  };
+  const rows = [
+    ...sessions.map((e) => {
+      const kind = e.flow === 'sos' ? 'SOS' : e.flow === 'program' ? `Sera · settimana ${e.week}` : 'Sessione libera';
+      const mins = e.seconds < 60 ? '<1 min' : `${Math.round(e.seconds / 60)} min`;
+      const vals = e.gutAfter != null
+        ? `Stress ${e.stressBefore}→${e.stressAfter} · Pancia ${e.gutBefore}→${e.gutAfter}`
+        : `Stress ${e.stressBefore} · Pancia ${e.gutBefore}`;
+      return { ts: e.ts, html: `${kind} · ${vals}<div class="meta">${when(e.ts)} · ${mins}${e.tags?.length ? ' · ' + e.tags.join(', ') : ''}</div>` };
+    }),
+    ...mornings.map((m) => ({ ts: m.ts, html: `Mattino · Pancia ${m.gut} · Sonno ${m.sleep}<div class="meta">${when(m.ts)}</div>` })),
+  ]
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 30);
 
   $('#diaryBody').innerHTML = `
-    <p class="label">Pancia prima e dopo (ultime ${recent.length})</p>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}</svg>
-    <div class="legend"><span><i style="background:rgba(224,177,106,.55)"></i>prima</span><span><i style="background:var(--accent)"></i>dopo</span></div>
+    <div id="diaryResults"></div>
     ${insights.map((t) => `<p class="insight">${t}</p>`).join('')}
-    <ul class="entries">${items}</ul>`;
+    <ul class="entries">${rows.map((r) => `<li>${r.html}</li>`).join('')}</ul>`;
+  renderResults($('#diaryResults'), false);
 }
 
 // ---------------------------------------------------------------------------
@@ -767,7 +1070,9 @@ function frame() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.session) requestWakeLock();
+  if (document.visibilityState !== 'visible') return;
+  if (state.session) requestWakeLock();
+  else if ($('[data-screen="home"]').classList.contains('active')) renderHome(); // e.g. reopened next morning
 });
 
 if ('speechSynthesis' in window) speechSynthesis.getVoices(); // warm up the voice list

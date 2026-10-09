@@ -1,6 +1,7 @@
-// Offline cache: the app is fully static, so cache-first with a versioned bucket.
-const CACHE = 'fluire-v1';
-const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.json', 'icon.svg'];
+// Network-first so updates pushed to GitHub Pages show up right away; the cache
+// is only a fallback for offline use (e.g. in bed with flaky Wi-Fi).
+const CACHE = 'fluire-v2';
+const FILES = ['./', 'index.html', 'styles.css', 'program.js', 'app.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -16,5 +17,13 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });

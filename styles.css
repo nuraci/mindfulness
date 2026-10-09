@@ -84,6 +84,47 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 .btn.small { padding: 10px 14px; font-size: 0.9rem; }
 .btn:active { transform: scale(0.98); }
 
+.card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card h3 { margin: 0; font-weight: 500; font-size: 1.1rem; }
+.card .kicker { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.card p { margin: 0; line-height: 1.45; font-size: 0.93rem; }
+.card.morning { border-color: var(--warn); }
+.badge { display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: var(--warn); color: #241a08; margin-left: 6px; vertical-align: 2px; }
+
+.dots { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 0.82rem; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--accent); }
+.dots i.on { background: var(--accent); }
+.dots span { margin-left: 6px; }
+
+.practice { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 12px; }
+.practice p { flex: 1; color: var(--muted); }
+
+.times { display: flex; gap: 12px; margin: 8px 0; }
+.times label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; flex: 1; }
+.times input { font: inherit; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text); }
+
+.trend { width: 100%; height: auto; display: block; overflow: visible; }
+.trend .grid { stroke: var(--line); stroke-width: 1; }
+.trend .axis { fill: var(--muted); font-size: 9px; }
+.trend .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.trend .dot { stroke: var(--accent); stroke-width: 2; }
+.trend .dot.with { fill: var(--accent); }
+.trend .dot.without { fill: var(--bg); }
+.trend .hit { fill: transparent; cursor: pointer; }
+.readout { color: var(--muted); font-size: 0.82rem; min-height: 1.2em; margin: 0; }
+.legend .ring { background: transparent; border: 2px solid var(--accent); border-radius: 50%; }
+.legend .fill { background: var(--accent); border-radius: 50%; }
+
+.screen.night { background: rgba(0, 0, 0, 0.88); border-color: transparent; color: var(--muted); }
+.screen.night h2 { color: var(--text); }
+
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat {
   border: 1px solid var(--line);

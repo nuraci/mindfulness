@@ -22,16 +22,29 @@
         <p class="tagline">Respira con la pancia. Guarda il fiume schiarirsi.</p>
       </header>
 
-      <div class="stats" id="homeStats"></div>
+      <div id="morningCard"></div>
+      <div id="programCard"></div>
+      <div id="resultsCard"></div>
 
       <div class="actions">
-        <button class="btn primary" data-go="checkin" data-flow="flow">Inizia una sessione</button>
+        <button class="btn" data-go="checkin" data-flow="flow">Sessione libera</button>
         <button class="btn" data-go="checkin" data-flow="sos">SOS · 90 secondi</button>
         <button class="btn ghost" data-go="diary">Diario</button>
       </div>
 
+      <details class="info" id="reminders">
+        <summary>Promemoria</summary>
+        <p>Aggiunge al calendario del telefono due appuntamenti ogni giorno per le 6 settimane: la sessione della sera e il check-in del mattino.</p>
+        <div class="times">
+          <label>Sera <input type="time" id="remEvening" value="22:30"></label>
+          <label>Mattino <input type="time" id="remMorning" value="07:30"></label>
+        </div>
+        <button class="btn small" id="remBtn">Aggiungi al calendario</button>
+      </details>
+
       <details class="info">
         <summary>Come funziona</summary>
+        <p><strong>Il percorso:</strong> 6 settimane, una nuova immagine guidata ogni settimana. La pratica si fa la sera, a letto; il mattino dopo un check-in da 10 secondi misura com'è la pancia. Così vedi con i tuoi dati se le sere di pratica portano mattine migliori.</p>
         <p>Il respiro lento con la pancia, con l'espirazione più lunga dell'inspirazione, attiva il nervo vago: il "cavo" che collega cervello e intestino e che riporta il corpo in modalità riposo e digestione.</p>
         <p><strong>Modalità pancia:</strong> sdraiati e appoggia il telefono sul ventre, sotto l'ombelico. L'app sente il respiro con l'accelerometro. Quando vai a tempo con la guida il fiume si schiarisce e si accende una nota armonica. Puoi tenere gli occhi chiusi e seguire solo il suono.</p>
         <p><strong>SOS:</strong> il "sospiro fisiologico" (due inspirazioni ravvicinate e una lunga espirazione) per i momenti di tensione acuta.</p>
@@ -70,9 +83,9 @@
       <div id="durationGroup">
         <p class="label">Durata</p>
         <div class="seg" id="duration">
-          <button data-v="180">3 min</button>
-          <button data-v="300" class="on">5 min</button>
-          <button data-v="600">10 min</button>
+          <button data-v="300">5 min</button>
+          <button data-v="600" class="on">10 min</button>
+          <button data-v="900">15 min</button>
         </div>
       </div>
       <p class="label">Modalità</p>
@@ -132,6 +145,15 @@
       </div>
     </section>
 
+    <!-- NIGHT: after an evening programme session -->
+    <section class="screen night" data-screen="night">
+      <h2>Buonanotte.</h2>
+      <div id="nightBody"></div>
+      <div class="actions">
+        <button class="btn ghost" data-go="home">Chiudi</button>
+      </div>
+    </section>
+
     <!-- DIARY -->
     <section class="screen" data-screen="diary">
       <h2>Diario</h2>
@@ -142,6 +164,7 @@
     </section>
   </main>
 
+  <script src="program.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
