@@ -84,8 +84,7 @@ function stopAnchor(goHome = true) {
   anchor.running = false;
   clearTimeout(anchor.timer);
   if ('vibrate' in navigator) navigator.vibrate(0);
-  wakeLock?.release().catch(() => {});
-  wakeLock = null;
+  releaseWakeLock();
   $('#anchorSetup').hidden = false;
   $('#anchorRun').hidden = true;
   $('[data-screen="anchor"]').classList.remove('running');

@@ -249,6 +249,7 @@ if (typeof document !== 'undefined') {
   function stopCamera() {
     hrv.running = false;
     hrv.cam.stop();
+    releaseWakeLock();
   }
 
   $('#hrvStart').addEventListener('click', async () => {
@@ -267,9 +268,13 @@ if (typeof document !== 'undefined') {
       $('#hrvStart').hidden = false;
       return;
     }
-    $('#hrvTorchHint').textContent = torch
-      ? ''
-      : 'Il browser non permette di accendere il flash: mettiti vicino a una luce forte, per esempio sotto una lampada.';
+    // The finger is on the camera, nobody touches the screen: keep it on, or
+    // the phone locks after its timeout and the camera (and flash) stop.
+    const awake = await requestWakeLock();
+    $('#hrvTorchHint').textContent = [
+      torch ? '' : 'Il browser non permette di accendere il flash: mettiti vicino a una luce forte, per esempio sotto una lampada.',
+      awake ? '' : 'Il telefono non mi permette di tenere acceso lo schermo (forse per il risparmio energetico): se si spegne, la misura si interrompe.',
+    ].filter(Boolean).join(' ');
     hrv.samples = [];
     hrv.start = now();
     hrv.lastCovered = now();

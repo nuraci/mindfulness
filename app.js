@@ -24,7 +24,8 @@ const KEYS = {
   reflections: 'fluire.reflections.v1', // [{ ts, week, q, a }] answers to the weekly question
   weekHidden: 'fluire.weekhidden.v1',   // week key of the last weekly summary closed on home
   episodes: 'fluire.episodes.v1',   // [{ ts, types, intensity, context, after?, sos? }] gut discomfort as it happens
-  resonance: 'fluire.resonance.v1', // { ts, rate, results: [{ rate, amp }], use } personal breathing rate
+  resonance: 'fluire.resonance.v1', // { ts, rate, results: [{ rate, amp }] } personal breathing rate
+  rhythm: 'fluire.rhythm.v1',       // { mode: 'auto' | 'personal' | 'manual', inhale, exhale } in seconds
   sync: 'fluire.sync.v1',           // { linked, last } Google Drive sync state on this device
 };
 
@@ -111,16 +112,36 @@ const PATTERNS = {
   ],
 };
 
-// The personal resonance rate, once measured and enabled, replaces the
-// standard 4/6 and 5/7 rhythms (but not the SOS sighs). 40 % inhale, 60 % exhale.
-function breathPattern(name) {
+// Which rhythm sessions, the gut SOS and the anchor breathe at:
+//   auto     the programme's (4 s in / 6 s out, 5 / 7 in the last weeks)
+//   personal the resonance rate from the camera test, 40 % in / 60 % out
+//   manual   seconds chosen by the user
+// The SOS sighs always keep their own pattern.
+function rhythmSettings() {
+  const saved = store.get(KEYS.rhythm, null);
+  if (saved) return saved;
   const r = store.get(KEYS.resonance, null);
-  if (!r || !r.use || (name !== 'flow' && name !== 'deep')) return PATTERNS[name];
-  const cycle = 60 / r.rate;
-  const inhale = Math.round(cycle * 0.4 * 10) / 10;
+  return { mode: r?.use ? 'personal' : 'auto', inhale: 4, exhale: 6 }; // older saves had resonance.use
+}
+
+function breathTimes(name) {
+  const s = rhythmSettings();
+  const r = store.get(KEYS.resonance, null);
+  if (s.mode === 'manual') return { inhale: s.inhale, exhale: s.exhale };
+  if (s.mode === 'personal' && r) {
+    const cycle = 60 / r.rate;
+    const inhale = Math.round(cycle * 0.4 * 10) / 10;
+    return { inhale, exhale: Math.round((cycle - inhale) * 10) / 10 };
+  }
+  return { inhale: PATTERNS[name][0].dur, exhale: PATTERNS[name][1].dur };
+}
+
+function breathPattern(name) {
+  if (name !== 'flow' && name !== 'deep') return PATTERNS[name];
+  const { inhale, exhale } = breathTimes(name);
   return [
     { label: 'Inspira con la pancia', dur: inhale, to: 1, cue: 'in' },
-    { label: 'Espira lentamente', dur: Math.round((cycle - inhale) * 10) / 10, to: 0, cue: 'out' },
+    { label: 'Espira lentamente', dur: exhale, to: 0, cue: 'out' },
   ];
 }
 
@@ -661,13 +682,59 @@ function renderSetup() {
     ? 'SOS · sospiro fisiologico'
     : st ? `Settimana ${st.week} · ${PROGRAM[st.week - 1].title}` : 'Sessione libera';
   $('#durationGroup').style.display = sos || gutSos ? 'none' : '';
-  const res = store.get(KEYS.resonance, null);
-  $('#rhythmHint').textContent = !sos && res?.use ? `Ritmo: il tuo, ${String(res.rate).replace('.', ',')} respiri al minuto.` : '';
+  $('#rhythmBox').hidden = sos;
+  renderRhythm();
   $('#modeHint').textContent =
     state.mode === 'belly'
       ? 'Sdraiati e appoggia il telefono sulla pancia, sotto l’ombelico, con una mano sopra. Il telefono potrebbe chiederti il permesso di usare i sensori di movimento. Su iPhone togli la modalità silenziosa per sentire il suono.'
       : 'Segui il fiume e il suono: quando l’acqua sale inspira con la pancia, quando scende espira lentamente.';
 }
+
+// The rhythm control in the setup screen.
+const fmtNum = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+
+function renderRhythm() {
+  const s = rhythmSettings();
+  const res = store.get(KEYS.resonance, null);
+  const st = programStatus();
+  const base = st ? PROGRAM[st.week - 1].pattern : 'flow';
+  const { inhale, exhale } = breathTimes(base);
+  const perMin = 60 / (inhale + exhale);
+  const label = { auto: 'Ritmo del percorso', personal: 'Il tuo ritmo', manual: 'Ritmo manuale' }[s.mode];
+  $('#rhythmHint').textContent = `${label}: ${fmtNum(inhale)} s dentro, ${fmtNum(exhale)} s fuori (${fmtNum(perMin)} al minuto)`;
+  $$('#rhythmMode button').forEach((b) => b.classList.toggle('on', b.dataset.v === s.mode));
+  const pBtn = $('#rhythmMode button[data-v="personal"]');
+  pBtn.disabled = !res;
+  pBtn.textContent = res ? 'Il mio' : 'Il mio (fai il test)';
+  $('#rhythmManual').hidden = s.mode !== 'manual';
+  setSlider('rhInhale', s.inhale);
+  setSlider('rhExhale', s.exhale);
+  $('#rhInhaleOut').textContent = fmtNum(s.inhale);
+  $('#rhExhaleOut').textContent = fmtNum(s.exhale);
+
+  let advice;
+  if (s.mode === 'auto') advice = 'Consigliato: circa 6 respiri al minuto con l’espirazione più lunga, il ritmo più studiato per il nervo vago. Nelle ultime settimane del percorso rallenta a 5.';
+  else if (s.mode === 'personal') advice = 'Il ritmo trovato con il test della fotocamera: quello in cui il tuo battito oscilla di più.';
+  else if (exhale < inhale) advice = 'L’espirazione più corta dell’inspirazione tende ad attivare, non a calmare: prova ad allungarla un po’.';
+  else if (perMin > 8) advice = `${fmtNum(perMin)} respiri al minuto è ancora un ritmo veloce: va bene per cominciare, poi prova ad allungare piano piano.`;
+  else if (perMin < 4) advice = 'Un ritmo così lento può dare fame d’aria: se ti senti in affanno, accorcia un po’.';
+  else advice = 'Va bene: sei nella zona utile (4–8 respiri al minuto) con l’espirazione più lunga. Conta più restare rilassati che il numero preciso.';
+  $('#rhythmAdvice').textContent = advice;
+}
+
+$$('#rhythmMode button').forEach((b) =>
+  b.addEventListener('click', () => {
+    store.set(KEYS.rhythm, { ...rhythmSettings(), mode: b.dataset.v });
+    renderRhythm();
+  })
+);
+['rhInhale', 'rhExhale'].forEach((id) => {
+  bindSlider($('#' + id));
+  $('#' + id).addEventListener('input', () => {
+    store.set(KEYS.rhythm, { ...rhythmSettings(), mode: 'manual', inhale: +$('#rhInhale').value, exhale: +$('#rhExhale').value });
+    renderRhythm();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Home
@@ -1075,9 +1142,22 @@ $('#startBtn').addEventListener('click', async () => {
 
 $('#stopBtn').addEventListener('click', () => endSession());
 
+// Keeps the screen on during sessions, readings and the anchor: with the
+// finger on the camera or the phone on the belly nobody touches the screen.
+// Resolves false when the browser refuses (e.g. battery saver).
 let wakeLock = null;
 async function requestWakeLock() {
-  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    return true;
+  } catch {
+    wakeLock = null;
+    return false;
+  }
+}
+function releaseWakeLock() {
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
 }
 
 function endSession() {
@@ -1086,8 +1166,7 @@ function endSession() {
   state.session = null;
   s.sensor?.stop();
   s.guide.stop();
-  wakeLock?.release().catch(() => {});
-  wakeLock = null;
+  releaseWakeLock();
 
   const seconds = Math.max(0, Math.round(now() - s.startAt));
   const base = {

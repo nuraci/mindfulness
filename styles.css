@@ -388,3 +388,12 @@ body[data-view="night"] .update-bar { display: none; }
 .res-bar { fill: rgba(143, 168, 173, 0.45); }
 .res-bar.best { fill: var(--accent); }
 .res-val { fill: var(--text); font-size: 10px; }
+
+/* Rhythm control in the setup screen */
+.rhythm { display: flex; flex-direction: column; }
+.rhythm[open] { gap: 12px; }
+.rhythm summary { color: var(--text); font-size: 0.92rem; }
+.rhythm[hidden] { display: none; }
+#rhythmManual { display: flex; flex-direction: column; gap: 10px; }
+#rhythmManual[hidden] { display: none; }
+.seg button:disabled { opacity: 0.45; cursor: default; }

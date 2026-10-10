@@ -63,6 +63,14 @@ practice lead to better mornings?).
   with the largest swing is the resonance frequency. Once saved, sessions and
   the anchor breathe at that rate (40 % in, 60 % out) instead of 4/6 and 5/7;
   the SOS sighs are unchanged. Losing the finger restarts only the current rate.
+- **Breathing rhythm setting.** In the session setup: *Percorso* (default,
+  4 s in / 6 s out, 5 / 7 in the last two weeks), *Il mio* (the resonance
+  test result) or *Manuale* (inhale 2–7 s, exhale 3–10 s), with advice when
+  the exhale is shorter than the inhale or the rate leaves the 4–8 breaths/min
+  range. Applies to sessions, the gut SOS and the anchor; not to the SOS sighs.
+- **Screen kept on.** Sessions, HRV readings, the resonance test and the
+  anchor hold a screen wake lock (nobody touches the screen with the finger on
+  the camera or the phone on the belly); if the browser refuses, the app says so.
 - **Dinner → morning.** The diary flags dinner items that go with a worse
   morning (≥ 3 mornings with and without, ≥ 1 point difference), worded as a
   hint to discuss with a doctor, not as proof.

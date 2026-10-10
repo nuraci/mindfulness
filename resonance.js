@@ -40,11 +40,11 @@ function renderResIntro() {
   $('#resCurrent').innerHTML = r
     ? `<div class="card">
         <p>Il tuo ritmo: <strong>${fmtRate(r.rate)} respiri al minuto</strong>, misurato il ${new Date(r.ts).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.</p>
-        <label class="toggle"><input type="checkbox" id="resUse" ${r.use ? 'checked' : ''}> Usalo nelle sessioni e nell’àncora</label>
+        <label class="toggle"><input type="checkbox" id="resUse" ${rhythmSettings().mode === 'personal' ? 'checked' : ''}> Usalo nelle sessioni e nell’àncora</label>
       </div>`
     : '';
   $('#resUse')?.addEventListener('change', (e) => {
-    store.set(KEYS.resonance, { ...store.get(KEYS.resonance, {}), use: e.target.checked });
+    store.set(KEYS.rhythm, { ...rhythmSettings(), mode: e.target.checked ? 'personal' : 'auto' });
     renderResLabel();
   });
   $('#resStart').textContent = r ? 'Rifai il test' : 'Inizia il test';
@@ -77,16 +77,16 @@ $('#resStart').addEventListener('click', async () => {
     return;
   }
   res.running = true;
-  requestWakeLock();
+  const awake = await requestWakeLock();
   if (!torch) $('#resStatus').textContent = 'Il browser non accende il flash: mettiti vicino a una luce forte.';
+  if (!awake) $('#resStatus').textContent += ' Il telefono non mi permette di tenere acceso lo schermo: disattiva il risparmio energetico.';
   requestAnimationFrame(resPacer);
 });
 
 function stopRes() {
   res.running = false;
   res.cam.stop();
-  wakeLock?.release().catch(() => {});
-  wakeLock = null;
+  releaseWakeLock();
 }
 
 $('#resStop').addEventListener('click', () => {
@@ -194,7 +194,8 @@ function showResResult() {
         <button class="btn ghost" data-go="home">Non ora</button>
       </div>`;
     $('#resSave').addEventListener('click', () => {
-      store.set(KEYS.resonance, { ts: Date.now(), rate: best.rate, results: res.results, use: true });
+      store.set(KEYS.resonance, { ts: Date.now(), rate: best.rate, results: res.results });
+      store.set(KEYS.rhythm, { ...rhythmSettings(), mode: 'personal' });
       renderResLabel();
       show('home');
     });

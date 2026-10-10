@@ -128,7 +128,25 @@
         <button class="btn small" id="voiceTest" type="button">Prova</button>
       </div>
       <label class="toggle"><input type="checkbox" id="sound" checked> Suono del fiume</label>
-      <p class="hint" id="rhythmHint"></p>
+      <details class="info rhythm" id="rhythmBox">
+        <summary id="rhythmHint"></summary>
+        <div class="seg" id="rhythmMode">
+          <button data-v="auto">Percorso</button>
+          <button data-v="personal">Il mio</button>
+          <button data-v="manual">Manuale</button>
+        </div>
+        <div id="rhythmManual">
+          <label class="slider">
+            <span>Inspira <span><output id="rhInhaleOut">4</output> s</span></span>
+            <input type="range" id="rhInhale" min="2" max="7" step="0.5" value="4">
+          </label>
+          <label class="slider">
+            <span>Espira <span><output id="rhExhaleOut">6</output> s</span></span>
+            <input type="range" id="rhExhale" min="3" max="10" step="0.5" value="6">
+          </label>
+        </div>
+        <p class="hint" id="rhythmAdvice"></p>
+      </details>
       <p class="hint" id="modeHint"></p>
       <div class="actions">
         <button class="btn primary" id="startBtn">Inizia</button>
