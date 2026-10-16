@@ -329,7 +329,9 @@ h2 { margin: 0; font-weight: 400; font-size: 1.5rem; }
 body[data-view="session"] .update-bar,
 body[data-view="anchor"] .update-bar,
 body[data-view="hrv"] .update-bar,
-body[data-view="night"] .update-bar { display: none; }
+body[data-view="night"] .update-bar,
+body[data-view="stretchRun"] .update-bar,
+body[data-view="stretchEnd"] .update-bar { display: none; }
 
 .version { color: var(--muted); font-size: 0.75rem; text-align: center; margin: 0; opacity: 0.7; }
 
@@ -397,3 +399,38 @@ body[data-view="night"] .update-bar { display: none; }
 #rhythmManual { display: flex; flex-direction: column; gap: 10px; }
 #rhythmManual[hidden] { display: none; }
 .seg button:disabled { opacity: 0.45; cursor: default; }
+
+/* Stretching */
+.pose-fig, .pose-mini { fill: none; stroke: var(--text); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.pose-fig circle, .pose-mini circle { fill: var(--text); stroke: none; }
+.pose-fig .floor, .pose-mini .floor { stroke: var(--line); stroke-width: 2; }
+.pose-fig .prop, .pose-mini .prop { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 3 3; }
+.pose-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pose-list li { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px 4px 4px; }
+.pose-mini { width: 48px; height: 32px; flex: none; stroke-width: 5; }
+
+.stretch-run .hud { justify-content: space-between; }
+.st-next { font-size: 0.85rem; text-align: right; }
+.st-main { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.st-main h2 { margin: 0; font-weight: 400; font-size: 1.3rem; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6); }
+.st-ring {
+  --p: 0;
+  width: min(72vw, 280px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(closest-side, #0b1620 94%, transparent 95%),
+    conic-gradient(var(--accent) calc(var(--p) * 1turn), rgba(255, 255, 255, 0.08) 0);
+}
+.st-ring #stFig { width: 78%; }
+.st-ring .pose-fig { width: 100%; height: auto; display: block; }
+.st-time { font-size: 1.6rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.st-phase { margin-top: 0; font-size: 1.5rem; min-height: 1.3em; }
+.st-controls { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.st-controls #stTooMuch[hidden] { visibility: hidden; display: block; }
+.st-row { display: flex; gap: 8px; }
+.st-row .btn { flex: 1; }
+#stSaved[hidden], #stAfter[hidden] { display: none; }
+#stAfter { display: flex; flex-direction: column; gap: 12px; }

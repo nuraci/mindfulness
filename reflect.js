@@ -16,7 +16,7 @@ function leavePark() {
   $('#parkTodo').value = '';
   $$('#parkWorries, #parkTodo').forEach((t) => t.classList.remove('drift'));
   $('#parkNote').hidden = true;
-  show('setup');
+  show(state.flow === 'stretch' ? 'stretchSetup' : 'setup');
 }
 
 $('#parkSave').addEventListener('click', () => {

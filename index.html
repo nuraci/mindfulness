@@ -28,6 +28,7 @@
       <div id="parkedCard"></div>
       <div id="weekCard"></div>
       <div id="programCard"></div>
+      <div id="stretchCard"></div>
       <div id="resultsCard"></div>
       <div id="hrvCard"></div>
 
@@ -56,6 +57,7 @@
         <p><strong>Il percorso:</strong> 6 settimane, una nuova immagine guidata ogni settimana. La pratica si fa la sera, a letto; il mattino dopo un check-in da 10 secondi misura com'è la pancia. Così vedi con i tuoi dati se le sere di pratica portano mattine migliori.</p>
         <p>Il respiro lento con la pancia, con l'espirazione più lunga dell'inspirazione, attiva il nervo vago: il "cavo" che collega cervello e intestino e che riporta il corpo in modalità riposo e digestione.</p>
         <p><strong>Modalità pancia:</strong> sdraiati e appoggia il telefono sul ventre, sotto l'ombelico. L'app sente il respiro con l'accelerometro. Quando vai a tempo con la guida il fiume si schiarisce e si accende una nota armonica. Puoi tenere gli occhi chiusi e seguire solo il suono.</p>
+        <p><strong>Stretching della sera:</strong> al posto della sessione di respiro, posture passive a terra o a letto, tenute a lungo con il respiro lento. 4 tappe, da tenute di un minuto fino a quelle profonde dello Yin yoga. Sempre leggero: lo stretching intenso alza lo stress invece di abbassarlo.</p>
         <p><strong>SOS:</strong> il "sospiro fisiologico" (due inspirazioni ravvicinate e una lunga espirazione) per i momenti di tensione acuta.</p>
       </details>
 
@@ -167,6 +169,76 @@
         <path id="traceBreath" />
       </svg>
       <button class="btn ghost small" id="stopBtn">Termina</button>
+    </section>
+
+    <!-- STRETCH SETUP: evening static stretching, replaces the breathing session -->
+    <section class="screen" data-screen="stretchSetup">
+      <h2 id="stTitle">Stretching della sera</h2>
+      <details class="info warn" id="stSafety">
+        <summary>Prima di iniziare</summary>
+        <p><strong>La regola:</strong> una sensazione leggera di allungamento, circa 3 su 10. Mai dolore, mai formicolii o scosse. Lo stretching che calma è quello morbido: se tiri troppo il corpo si mette in allerta e lo stress sale invece di scendere.</p>
+        <p>Muscoli rilassati, nessun molleggio. Esci dalle posizioni lentamente. Usa cuscini e coperte quanto vuoi.</p>
+        <p>Parlane prima con il medico se sei in gravidanza, hai avuto da poco un intervento o un infortunio, hai osteoporosi, ernie o dolore che si irradia a una gamba o un braccio, glaucoma o pressione molto alta (per le gambe al muro).</p>
+      </details>
+      <p class="label">Tappa</p>
+      <div class="seg" id="stStages"></div>
+      <p class="label">Durata</p>
+      <div class="seg" id="stDuration">
+        <button data-v="600">10 min</button>
+        <button data-v="900" class="on">15 min</button>
+        <button data-v="1200">20 min</button>
+      </div>
+      <div id="stPlan"></div>
+      <label class="toggle"><input type="checkbox" id="stVoice" checked> Voce guida</label>
+      <label class="toggle"><input type="checkbox" id="stSound" checked> Suono del fiume</label>
+      <p class="hint" id="stRhythm"></p>
+      <p class="hint">Vuoi vedere l’effetto sul nervo vago? Misura il battito adesso e di nuovo alla fine: il confronto compare da solo.</p>
+      <button class="btn small" id="stHrv">Misura il battito prima</button>
+      <div class="actions">
+        <button class="btn primary" id="stStart">Inizia</button>
+        <button class="btn ghost" data-go="home">Indietro</button>
+      </div>
+    </section>
+
+    <!-- STRETCH RUN -->
+    <section class="screen session stretch-run" data-screen="stretchRun">
+      <div class="hud"><span id="stTotal"></span><span class="st-next" id="stNext"></span></div>
+      <div class="st-main">
+        <h2 id="stPose"></h2>
+        <div class="st-ring" id="stRing"><div id="stFig"></div></div>
+        <div class="st-time" id="stStepTime"></div>
+        <div class="phase st-phase" id="stPhase"></div>
+        <p class="sensor-hint" id="stEasier"></p>
+      </div>
+      <div class="st-controls">
+        <button class="btn" id="stTooMuch">Tira troppo</button>
+        <div class="st-row">
+          <button class="btn ghost small" id="stPause">Pausa</button>
+          <button class="btn ghost small" id="stSkip">Salta</button>
+          <button class="btn ghost small" id="stStop">Termina</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STRETCH END -->
+    <section class="screen night" data-screen="stretchEnd">
+      <h2>Buonanotte.</h2>
+      <div id="stEndBody"></div>
+      <div id="stAfter">
+        <label class="slider">
+          <span>Stress adesso <output id="stStressAfterOut">5</output></span>
+          <input type="range" id="stStressAfter" min="0" max="10" value="5">
+          <span class="scale"><i>calmo</i><i>al limite</i></span>
+        </label>
+        <button class="btn primary" id="stSave">Salva</button>
+      </div>
+      <div id="stSaved" hidden>
+        <p class="hint"></p>
+      </div>
+      <div class="actions">
+        <button class="btn small" id="stHrvAfter">Misura il battito ora</button>
+        <button class="btn ghost" data-go="home">Chiudi</button>
+      </div>
     </section>
 
     <!-- EPISODE: log gut discomfort as it happens, optionally followed by the gut SOS -->
@@ -349,6 +421,7 @@
   <script src="episodes.js"></script>
   <script src="resonance.js"></script>
   <script src="reflect.js"></script>
+  <script src="stretch.js"></script>
   <script src="report.js"></script>
   <script src="sync.js"></script>
 </body>

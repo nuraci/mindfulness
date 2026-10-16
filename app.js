@@ -12,6 +12,7 @@ const now = () => performance.now() / 1000;
 
 const KEYS = {
   sessions: 'fluire.sessions.v1',   // [{ ts, flow, week?, mode, seconds, sync, stressBefore, gutBefore, stressAfter?, gutAfter?, tags }]
+                                    // stretching: { ts, flow: 'stretch', stage, seconds, complete, poses, tooMuch, stressBefore, gutBefore, stressAfter?, tags }
   mornings: 'fluire.mornings.v1',   // [{ ts, gut, sleep, bristol?, dinner? }]
   program: 'fluire.program.v1',     // { started, seenWeek }
   anchors: 'fluire.anchors.v1',     // [ts] daytime practice done
@@ -27,6 +28,7 @@ const KEYS = {
   resonance: 'fluire.resonance.v1', // { ts, rate, results: [{ rate, amp }] } personal breathing rate
   rhythm: 'fluire.rhythm.v1',       // { mode: 'auto' | 'personal' | 'manual', inhale, exhale } in seconds
   sync: 'fluire.sync.v1',           // { linked, last } Google Drive sync state on this device
+  stretchSafety: 'fluire.stretchsafety.v1', // ts when the stretching safety notes were first accepted
 };
 
 const store = {
@@ -614,6 +616,7 @@ function show(name) {
   if (name === 'diary') renderDiary();
   if (name === 'setup') renderSetup();
   if (name === 'report') renderReport();
+  if (name === 'stretchSetup') renderStretchSetup();
   window.scrollTo(0, 0);
 }
 
@@ -630,7 +633,8 @@ bindGo(document);
 // Before the evening session, offer the thought parking once per evening.
 $('#checkinNext').addEventListener('click', () => {
   const parkedTonight = store.get(KEYS.thoughts, []).some((t) => eveningKey(t.ts) === eveningKey(Date.now()));
-  show(state.flow === 'program' && !parkedTonight ? 'park' : 'setup');
+  const evening = state.flow === 'program' || state.flow === 'stretch';
+  show(evening && !parkedTonight ? 'park' : state.flow === 'stretch' ? 'stretchSetup' : 'setup');
 });
 
 function bindSlider(input) {
@@ -746,6 +750,7 @@ function renderHome() {
   renderBackupNudge();
   renderMorningCard(st);
   renderProgramCard(st);
+  renderStretchCard($('#stretchCard'));
   renderResults($('#resultsCard'), true);
   renderHrvCard($('#hrvCard'));
   renderParkedCard($('#parkedCard'));
@@ -877,6 +882,7 @@ function renderProgramCard(st) {
   const w = PROGRAM[st.week - 1];
   const isNew = st.prog.seenWeek < st.week;
   const tonight = doneTonight();
+  const stretched = store.get(KEYS.sessions, []).some((e) => e.flow === 'stretch' && eveningKey(e.ts) === eveningKey(Date.now()));
   const anchorsToday = store.get(KEYS.anchors, []).filter((t) => dayKey(t) === dayKey(Date.now())).length;
   const dots = Array.from({ length: DAYS_PER_WEEK }, (_, i) => `<i class="${i < st.days ? 'on' : ''}"></i>`).join('');
   el.innerHTML = `
@@ -887,7 +893,7 @@ function renderProgramCard(st) {
       ${st.done
         ? '<p>Hai completato le 6 settimane. Continua con le sessioni che preferisci: il mare resta qui.</p>'
         : `<div class="dots">${dots}<span>${st.days} di ${DAYS_PER_WEEK} sere per la prossima tappa</span></div>`}
-      <button class="btn primary" id="progGo">${tonight ? 'Fatta stasera ✓ · Ripeti' : 'Sessione della sera'}</button>
+      <button class="btn primary" id="progGo">${tonight ? 'Fatta stasera ✓ · Ripeti' : stretched ? 'Stasera stretching ✓ · Sessione di respiro' : 'Sessione della sera'}</button>
       <div class="practice">
         <p><strong>Durante il giorno:</strong> ${w.daily}</p>
         <div class="practice-btns">
@@ -1366,6 +1372,7 @@ function renderDiary() {
   }
   const episodes = store.get(KEYS.episodes, []);
   insights.push(...episodeInsights(episodes));
+  insights.push(...stretchInsights(sessions, mornings));
   const syncs = sessions.filter((e) => e.sync != null).slice(-5);
   if (syncs.length >= 2) {
     insights.push(`Sintonia nelle ultime sessioni con il telefono sulla pancia: ${syncs.map((e) => e.sync + '%').join(' · ')}.`);
@@ -1377,9 +1384,11 @@ function renderDiary() {
   };
   const rows = [
     ...sessions.map((e) => {
-      const kind = e.flow === 'sos' ? 'SOS' : e.flow === 'program' ? `Sera · settimana ${e.week}` : 'Sessione libera';
+      const kind = e.flow === 'sos' ? 'SOS' : e.flow === 'program' ? `Sera · settimana ${e.week}` : e.flow === 'stretch' ? `Stretching · tappa ${e.stage + 1}` : 'Sessione libera';
       const mins = e.seconds < 60 ? '<1 min' : `${Math.round(e.seconds / 60)} min`;
-      const vals = e.gutAfter != null
+      const vals = e.flow === 'stretch'
+        ? (e.stressAfter != null ? `Stress ${e.stressBefore}→${e.stressAfter}` : `Stress ${e.stressBefore}`)
+        : e.gutAfter != null
         ? `Stress ${e.stressBefore}→${e.stressAfter} · Pancia ${e.gutBefore}→${e.gutAfter}`
         : `Stress ${e.stressBefore} · Pancia ${e.gutBefore}`;
       return { ts: e.ts, html: `${kind} · ${vals}<div class="meta">${when(e.ts)} · ${mins}${e.tags?.length ? ' · ' + e.tags.join(', ') : ''}</div>` };
@@ -1409,7 +1418,9 @@ function frame() {
   const dt = Math.min(0.1, t - last);
   last = t;
   let level, calm;
+  const stretchRun = window.stretchActive?.();
   if (state.session) ({ level, calm } = updateSession(state.session, t, dt));
+  else if (stretchRun) ({ level, calm } = updateStretch(stretchRun, t, dt));
   else { level = idlePacer.at(t).level; calm = 0.55; }
   river.draw(dt, level, calm);
   requestAnimationFrame(frame);
@@ -1430,7 +1441,7 @@ document.addEventListener('visibilitychange', () => {
 // in the background for days without reloading, which is when this matters.
 // ---------------------------------------------------------------------------
 
-const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'episodes.js', 'resonance.js', 'reflect.js', 'report.js', 'sync.js', 'styles.css'];
+const APP_FILES = ['index.html', 'app.js', 'program.js', 'hrv.js', 'anchor.js', 'episodes.js', 'resonance.js', 'reflect.js', 'stretch.js', 'report.js', 'sync.js', 'styles.css'];
 
 async function fingerprint(file) {
   const head = await fetch(file, { method: 'HEAD', cache: 'no-store' });

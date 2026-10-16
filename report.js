@@ -116,6 +116,8 @@ function renderReport() {
   const row = (label, value) => rows.push(`<tr><th>${label}</th><td>${value}</td></tr>`);
   row('Periodo', `${fmtDate(from)} – ${fmtDate(to)}`);
   row('Sere con pratica di respirazione', evenings);
+  const stretchEvenings = new Set(sessions.filter((e) => e.flow === 'stretch').map((e) => eveningKey(e.ts))).size;
+  if (stretchEvenings) row('Sere con stretching statico', stretchEvenings);
   row('Check-in del mattino', mornings.length);
   if (mornings.length) {
     row('Fastidio addominale al mattino, media (0–10)', f1(avg(mornings.map((m) => m.gut))));

@@ -230,8 +230,10 @@ if (typeof document !== 'undefined') {
     lastLive: 0,
   };
 
-  window.openHrv = (context) => {
+  // `back` is the screen the back button returns to.
+  window.openHrv = (context, back = 'home') => {
     hrv.context = context;
+    hrv.back = back;
     $('#hrvResult').innerHTML = '';
     $('#hrvStatus').textContent = '';
     $('#hrvBpm').textContent = '';
@@ -283,7 +285,7 @@ if (typeof document !== 'undefined') {
 
   $('#hrvBack').addEventListener('click', () => {
     stopCamera();
-    show('home');
+    show(hrv.back || 'home');
   });
 
   function sample(t, r, covered) {

@@ -63,6 +63,26 @@ practice lead to better mornings?).
   with the largest swing is the resonance frequency. Once saved, sessions and
   the anchor breathe at that rate (40 % in, 60 % out) instead of 4/6 and 5/7;
   the SOS sighs are unchanged. Losing the finger restarts only the current rate.
+- **Evening stretching (instead of the breathing session).** Passive static
+  holds on the floor or in bed, guided by voice, breathing at the user's
+  rhythm (see below). A four-stage path, 4 evenings per stage: *Le basi*
+  (60 s holds), *Le anche* (90 s), *Schiena e spalle* (150 s) and *Il
+  silenzio lungo* (210 s, Yin-style). 10, 15 or 20 minutes; the planner keeps
+  the highest-priority poses that fit and always closes with a rest. Each pose
+  has a stick figure, entry instructions, a focus cue and an easier variant;
+  release cues rotate during the hold. A "Tira troppo" button shows and speaks
+  the easier variant and is logged per pose. Pause, skip and stop. Stress is
+  asked before (the usual check-in) and after; HRV can be measured before and
+  after (readings within 45 minutes are compared). The diary compares stress
+  and HRV before/after, and the next morning (gut, sleep, morning HRV) after
+  stretching vs after breathing vs no practice.
+  Why it looks like this: the evidence that stretching lowers cortisol is
+  thin (in one RCT, PRYSMS, gentle stretching beat restorative yoga on
+  salivary cortisol; Yin yoga reduced anxiety and sleep problems in stressed
+  adults), while strong or repeated stretching can raise sympathetic activity
+  and inflammatory markers. So intensity stays at about 3/10, holds are
+  passive, and the slow long-exhale breathing carries through every hold.
+  Cortisol itself cannot be measured at home, so the app measures what it can.
 - **Breathing rhythm setting.** In the session setup: *Percorso* (default,
   4 s in / 6 s out, 5 / 7 in the last two weeks), *Il mio* (the resonance
   test result) or *Manuale* (inhale 2–7 s, exhale 3–10 s), with advice when
@@ -149,6 +169,7 @@ Once loaded it works offline and can be installed to the home screen (PWA).
 | `reflect.js` | Thought parking before the evening session and the weekly summary |
 | `sync.js` | Optional Google Drive sync (appDataFolder) |
 | `resonance.js` | Resonance breathing test and its result chart |
+| `stretch.js` | Evening stretching: `STRETCH` (pose catalogue, path, session planner; pure, tested) and the stretching screens |
 | `report.js` | Backup export/import and the printable doctor's summary (loaded after `app.js`) |
 | `app.js` | Everything else, organised in sections: |
 | | `Pacer` — breathing patterns as piecewise eased curves |
@@ -224,6 +245,9 @@ hidden.
 4. Inter-beat intervals outside 330–1500 ms or > 20 % from their local median
    are rejected. RMSSD uses only consecutive valid pairs. A reading is saved
    only with ≥ 30 valid beats and ≥ 70 % of intervals valid.
+
+`node tests/stretch.test.js` checks that every stretching stage and duration
+fills the chosen time exactly and ends with rest.
 
 `node tests/ppg.test.js` checks the analysis against synthetic pulse waves
 with known heart rate and RMSSD, and checks that the resonance analysis finds
